@@ -1,0 +1,256 @@
+:root {
+  --start-hour: 8;
+  --end-hour: 24;
+  --hour-h: 44px;
+  --ink: #2b2b2b;
+  --sub: #777;
+  --line: #d9d4c7;
+  --line-soft: #ece8dd;
+  --paper: #fffdf7;
+  --bg: #f1eee6;
+
+  /* 曜日カラー：平日=黄 / 土=青 / 日=赤 */
+  --wd: #f2c230;
+  --wd-bg: #fff8dc;
+  --sat: #3d7fd9;
+  --sat-bg: #e9f1fc;
+  --sun: #e0473d;
+  --sun-bg: #fdecea;
+
+  --event: #6b8e5a;
+  --event-google: #4a72b5;
+  --today: #ff8a00;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* ---------- ツールバー ---------- */
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top));
+  background: #3a3a3a; color: #fff; position: sticky; top: 0; z-index: 20;
+}
+.nav, .actions { display: flex; align-items: center; gap: 6px; }
+.title { font-size: 18px; margin: 0 0 0 8px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+.icon-btn, .text-btn, .seg-btn {
+  background: transparent; border: 1px solid rgba(255,255,255,.35); border-radius: 6px;
+  color: #fff; min-height: 32px; padding: 0 10px;
+}
+.icon-btn { font-size: 18px; width: 34px; padding: 0; }
+.icon-btn:hover, .text-btn:hover, .seg-btn:hover { background: rgba(255,255,255,.12); }
+.seg { display: flex; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; overflow: hidden; }
+.seg-btn { border: 0; border-radius: 0; }
+.seg-btn.active { background: #fff; color: #3a3a3a; font-weight: 600; }
+#btn-sync.connected { border-color: #8fd18f; }
+#btn-sync.syncing { opacity: .6; }
+
+main { flex: 1; overflow: auto; padding: 10px; }
+.status {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+  background: rgba(30,30,30,.9); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 50;
+  max-width: calc(100vw - 32px);
+}
+
+/* ---------- 週間バーチカル ---------- */
+.week {
+  display: grid;
+  grid-template-columns: 40px repeat(7, minmax(0, 1fr));
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  min-width: 0;
+}
+.week > * { min-width: 0; }
+
+.day-head {
+  text-align: center; padding: 4px 2px; border-left: 1px solid var(--line);
+  border-bottom: 2px solid var(--wd); background: var(--wd-bg); cursor: pointer;
+}
+.day-head .dow { font-size: 11px; font-weight: 700; letter-spacing: .05em; }
+.day-head .num { font-size: 20px; font-weight: 600; line-height: 1.1; }
+.day-head.wd .dow { color: #9a7600; }
+.day-head.sat { border-bottom-color: var(--sat); background: var(--sat-bg); }
+.day-head.sat .dow, .day-head.sat .num { color: var(--sat); }
+.day-head.sun { border-bottom-color: var(--sun); background: var(--sun-bg); }
+.day-head.sun .dow, .day-head.sun .num { color: var(--sun); }
+.day-head.today .num {
+  display: inline-block; min-width: 1.6em; border-radius: 999px; background: var(--today); color: #fff;
+}
+.corner { border-bottom: 2px solid var(--line); }
+
+.allday-label, .tasks-label {
+  font-size: 9px; color: var(--sub); text-align: center;
+  border-top: 1px solid var(--line); padding: 4px 0; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+.tasks-label { writing-mode: vertical-rl; border-top-width: 2px; }
+.allday {
+  border-left: 1px solid var(--line); border-top: 1px solid var(--line-soft);
+  padding: 2px; min-height: 22px; display: flex; flex-direction: column; gap: 2px;
+}
+.allday-item {
+  font-size: 11px; background: var(--event); color: #fff; border-radius: 3px; padding: 1px 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+}
+.allday-item.google { background: var(--event-google); }
+
+.time-axis { position: relative; border-top: 1px solid var(--line); }
+.time-axis .hour {
+  height: var(--hour-h); font-size: 10px; color: var(--sub); text-align: right; padding-right: 4px;
+  transform: translateY(-6px);
+}
+.time-axis .hour:first-child { transform: none; }
+.time-axis .hour.last { height: 0; }
+
+.day-col {
+  position: relative; border-left: 1px solid var(--line); border-top: 1px solid var(--line);
+  height: calc(var(--hour-h) * (var(--end-hour) - var(--start-hour)));
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--hour-h) - 1px), var(--line-soft) calc(var(--hour-h) - 1px), var(--line-soft) var(--hour-h)),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--hour-h) / 2 - 1px), rgba(0,0,0,.025) calc(var(--hour-h) / 2 - 1px), rgba(0,0,0,.025) calc(var(--hour-h) / 2));
+  cursor: cell;
+}
+.day-col.wd { background-color: rgba(255, 248, 220, .25); }
+.day-col.sat { background-color: rgba(233, 241, 252, .55); }
+.day-col.sun { background-color: rgba(253, 236, 234, .55); }
+.day-col.today { box-shadow: inset 0 0 0 2px rgba(255,138,0,.35); }
+.now-line {
+  position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--today); z-index: 3; pointer-events: none;
+}
+.now-line::before {
+  content: ""; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--today);
+}
+
+.event {
+  position: absolute; border-radius: 4px; padding: 2px 4px; font-size: 11px; line-height: 1.25;
+  background: var(--event); color: #fff; overflow: hidden; cursor: pointer; z-index: 2;
+  border: 1px solid rgba(255,255,255,.7); box-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+.event.google { background: var(--event-google); }
+.event .t { font-size: 10px; opacity: .9; }
+.event .n { font-weight: 600; word-break: break-all; }
+
+/* ---------- タスク（1日5件） ---------- */
+.tasks {
+  border-left: 1px solid var(--line); border-top: 2px solid var(--line);
+  padding: 3px 3px 4px; display: flex; flex-direction: column;
+}
+.task {
+  display: flex; align-items: center; gap: 3px; min-height: 24px;
+  border-bottom: 1px dotted var(--line); transition: opacity .35s ease, transform .35s ease, max-height .35s ease;
+  max-height: 40px;
+}
+.task:last-child { border-bottom: 0; }
+.task input[type=checkbox] { margin: 0; width: 14px; height: 14px; flex: none; accent-color: #555; }
+.task .task-text {
+  flex: 1; min-width: 0; font-size: 12px; border: 0; background: transparent; padding: 2px 0; outline: none;
+  color: var(--ink); font-family: inherit;
+}
+.task .task-text::placeholder { color: #c5bfae; }
+.task.empty input[type=checkbox] { visibility: hidden; }
+.task.done { opacity: 0; transform: translateX(16px); }
+.task.done .task-text { text-decoration: line-through; }
+
+/* ---------- 月間 ---------- */
+.month {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  background: var(--paper); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+}
+.month .mhead {
+  text-align: center; font-size: 12px; font-weight: 700; padding: 6px 0; border-bottom: 2px solid var(--wd);
+  background: var(--wd-bg); color: #9a7600;
+}
+.month .mhead.sat { color: var(--sat); background: var(--sat-bg); border-bottom-color: var(--sat); }
+.month .mhead.sun { color: var(--sun); background: var(--sun-bg); border-bottom-color: var(--sun); }
+.mcell {
+  min-height: 104px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  padding: 3px; display: flex; flex-direction: column; gap: 2px; cursor: pointer; min-width: 0;
+}
+.mcell:nth-child(7n) { border-right: 0; }
+.mcell.wd { background: rgba(255, 248, 220, .35); }
+.mcell.sat { background: var(--sat-bg); }
+.mcell.sun { background: var(--sun-bg); }
+.mcell.other { opacity: .45; }
+.mcell .mnum { font-size: 13px; font-weight: 600; }
+.mcell.sat .mnum { color: var(--sat); }
+.mcell.sun .mnum { color: var(--sun); }
+.mcell.today .mnum {
+  background: var(--today); color: #fff; border-radius: 999px; display: inline-block; min-width: 1.7em; text-align: center;
+}
+.mitem {
+  font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-left: 3px solid var(--event); padding-left: 3px;
+}
+.mitem.google { border-left-color: var(--event-google); }
+.mitem.allday { background: var(--event); color: #fff; border-radius: 3px; padding: 0 4px; border: 0; }
+.mitem.allday.google { background: var(--event-google); }
+.mmore { font-size: 10px; color: var(--sub); }
+.mtasks { font-size: 10px; color: var(--sub); margin-top: auto; }
+
+/* ---------- ダイアログ ---------- */
+dialog {
+  border: 0; border-radius: 12px; padding: 0; width: min(420px, calc(100vw - 24px));
+  box-shadow: 0 10px 40px rgba(0,0,0,.3);
+}
+dialog::backdrop { background: rgba(0,0,0,.35); }
+dialog form { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+dialog h2 { margin: 0 0 4px; font-size: 17px; }
+dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #444; }
+dialog label.row { flex-direction: row; align-items: center; gap: 6px; }
+dialog .row.times { display: flex; gap: 10px; }
+dialog .row.times label { flex: 1; }
+dialog input:not([type=checkbox]), dialog textarea {
+  font: inherit; font-size: 15px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; width: 100%;
+}
+.dialog-actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.dialog-actions .spacer { flex: 1; }
+.dialog-actions button { padding: 8px 14px; border-radius: 6px; border: 1px solid #ccc; background: #fff; }
+.dialog-actions .primary { background: #3a3a3a; color: #fff; border-color: #3a3a3a; }
+.dialog-actions .danger { color: #c62828; border-color: #f0b4b4; }
+.hint { font-size: 12px; color: var(--sub); margin: 0; line-height: 1.5; }
+
+/* ---------- ウィジェット表示（?widget=1） ---------- */
+body.widget { --hour-h: 26px; background: var(--paper); }
+body.widget .toolbar { padding: 4px 8px; }
+body.widget .toolbar .actions { display: none; }
+body.widget .title { font-size: 14px; }
+body.widget main { padding: 4px; }
+body.widget .day-head .num { font-size: 15px; }
+body.widget .event .t { display: none; }
+body.widget .task { min-height: 18px; }
+body.widget .task .task-text { font-size: 10px; }
+
+/* ---------- スマホ ---------- */
+@media (max-width: 640px) {
+  :root { --hour-h: 36px; }
+  .toolbar { padding-left: 8px; padding-right: 8px; }
+  .title { font-size: 15px; margin-left: 4px; }
+  #btn-sync { padding: 0 8px; }
+  main { padding: 4px; }
+  .week { grid-template-columns: 26px repeat(7, minmax(0, 1fr)); }
+  .time-axis .hour { font-size: 9px; padding-right: 2px; }
+  .allday-label { font-size: 8px; letter-spacing: -.05em; }
+  .day-head { padding: 2px 0; }
+  .day-head .dow { font-size: 9px; }
+  .day-head .num { font-size: 15px; }
+  .event { font-size: 9px; padding: 1px 2px; }
+  .event .t { display: none; }
+  .allday-item { font-size: 9px; padding: 0 2px; }
+  .tasks { padding: 2px 1px; }
+  .task { gap: 2px; min-height: 22px; }
+  .task input[type=checkbox] { width: 11px; height: 11px; }
+  .task .task-text { font-size: 9px; }
+  .mcell { min-height: 72px; padding: 2px; }
+  .mitem { font-size: 9px; }
+}

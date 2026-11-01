@@ -1,0 +1,21 @@
+{
+  "name": "週間バーチカル手帳",
+  "short_name": "バーチカル",
+  "description": "Googleカレンダーと同期できる週間バーチカル型スケジュール帳",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1eee6",
+  "theme_color": "#3a3a3a",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "週間ウィジェット表示", "url": "./index.html?widget=1", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "月間", "url": "./index.html?view=month", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

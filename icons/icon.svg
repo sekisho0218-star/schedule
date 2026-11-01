@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#3a3a3a"/>
+  <rect x="64" y="96" width="384" height="340" rx="20" fill="#fffdf7"/>
+  <rect x="64" y="96" width="384" height="56" rx="20" fill="#fffdf7"/>
+  <g>
+    <rect x="80" y="110" width="52" height="30" rx="6" fill="#f2c230"/>
+    <rect x="135" y="110" width="52" height="30" rx="6" fill="#f2c230"/>
+    <rect x="190" y="110" width="52" height="30" rx="6" fill="#f2c230"/>
+    <rect x="245" y="110" width="52" height="30" rx="6" fill="#f2c230"/>
+    <rect x="300" y="110" width="52" height="30" rx="6" fill="#f2c230"/>
+    <rect x="355" y="110" width="40" height="30" rx="6" fill="#3d7fd9"/>
+    <rect x="398" y="110" width="36" height="30" rx="6" fill="#e0473d"/>
+  </g>
+  <rect x="140" y="180" width="44" height="90" rx="8" fill="#6b8e5a"/>
+  <rect x="250" y="220" width="44" height="130" rx="8" fill="#4a72b5"/>
+  <rect x="360" y="170" width="34" height="70" rx="8" fill="#6b8e5a"/>
+  <g stroke="#d9d4c7" stroke-width="4">
+    <line x1="80" y1="380" x2="432" y2="380"/>
+    <line x1="80" y1="408" x2="432" y2="408"/>
+  </g>
+</svg>
