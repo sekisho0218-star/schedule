@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 手帳の紙 -->
+    <path android:fillColor="#FFFDF7" android:pathData="M28,32h52a4,4 0 0 1 4,4v40a4,4 0 0 1 -4,4h-52a4,4 0 0 1 -4,-4v-40a4,4 0 0 1 4,-4z" />
+    <!-- 曜日ヘッダー：平日黄・土青・日赤 -->
+    <path android:fillColor="#F2C230" android:pathData="M27,35h37v6h-37z" />
+    <path android:fillColor="#3D7FD9" android:pathData="M65,35h8v6h-8z" />
+    <path android:fillColor="#E0473D" android:pathData="M74,35h7v6h-7z" />
+    <!-- 予定ブロック -->
+    <path android:fillColor="#6B8E5A" android:pathData="M34,46h8v14h-8z" />
+    <path android:fillColor="#4A72B5" android:pathData="M52,52h8v18h-8z" />
+    <path android:fillColor="#6B8E5A" android:pathData="M70,45h7v10h-7z" />
+</vector>

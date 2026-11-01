@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">バーチカル手帳</string>
+    <string name="widget_name">週間バーチカル</string>
+    <string name="widget_description">今週の予定（8:00〜24:00）とタスクを表示します</string>
+</resources>
