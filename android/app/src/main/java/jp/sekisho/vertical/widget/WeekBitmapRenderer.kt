@@ -16,7 +16,12 @@ import java.time.LocalTime
  * RemoteViews では自由な配置ができないため Canvas で描画する。
  */
 object WeekBitmapRenderer {
-    const val AXIS_DP = 18f
+    private const val BASE_AXIS_DP = 18f
+
+    /** 文字の拡大率：1日分の列幅に比例（スマホ=1.0、Galaxy Z Fold の内側画面など広い画面で最大1.6） */
+    fun textScale(widthDp: Float): Float = ((widthDp - BASE_AXIS_DP) / 7f / 50f).coerceIn(1f, 1.6f)
+
+    fun axisDp(widthDp: Float): Float = BASE_AXIS_DP * textScale(widthDp)
 
     fun render(
         widthDp: Float,
@@ -32,6 +37,9 @@ object WeekBitmapRenderer {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
         val cv = Canvas(bmp)
         fun dp(v: Float) = v * scale
+        val ts = textScale(widthDp)
+        /** 文字・部品のサイズ（拡大率を掛ける） */
+        fun sz(v: Float) = v * scale * ts
 
         val fill = Paint(Paint.ANTI_ALIAS_FLAG)
         val line = Paint().apply { strokeWidth = dp(1f) }
@@ -39,16 +47,16 @@ object WeekBitmapRenderer {
 
         cv.drawColor(Palette.PAPER)
 
-        val axisW = dp(AXIS_DP)
+        val axisW = dp(axisDp(widthDp))
         val colW = (w - axisW) / 7f
-        val headerH = dp(30f)
+        val headerH = sz(30f)
         val eventText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.DEFAULT_BOLD
-            textSize = dp(9f)
+            textSize = sz(9f)
             color = Palette.EVENT_TEXT
         }
         val maxAllDay = days.maxOf { dayEvents[it]?.allDay?.size ?: 0 }.coerceAtMost(2)
-        val allDayRowH = dp(13f)
+        val allDayRowH = sz(13f)
         val allDayH = if (maxAllDay == 0) dp(4f) else allDayRowH * maxAllDay + dp(3f)
         val top = headerH + allDayH
         val hours = Dates.END_HOUR - Dates.START_HOUR
@@ -64,18 +72,18 @@ object WeekBitmapRenderer {
             cv.drawRect(x, headerH - dp(2f), x + colW, headerH, fill)
             text.textAlign = Paint.Align.CENTER
             text.typeface = Typeface.DEFAULT_BOLD
-            text.textSize = dp(9f)
+            text.textSize = sz(9f)
             text.color = Palette.text(k)
-            cv.drawText(Dates.dowJa(d), x + colW / 2, dp(10f), text)
-            text.textSize = dp(14f)
+            cv.drawText(Dates.dowJa(d), x + colW / 2, sz(10f), text)
+            text.textSize = sz(14f)
             if (d == today) {
                 fill.color = Palette.TODAY
-                cv.drawCircle(x + colW / 2, dp(19.5f), dp(9f), fill)
+                cv.drawCircle(x + colW / 2, sz(19.5f), sz(9f), fill)
                 text.color = 0xFFFFFFFF.toInt()
             } else {
                 text.color = Palette.numText(k)
             }
-            cv.drawText("${d.dayOfMonth}", x + colW / 2, dp(24.5f), text)
+            cv.drawText("${d.dayOfMonth}", x + colW / 2, sz(24.5f), text)
         }
 
         // ---- 時間帯の背景・罫線 ----
@@ -96,11 +104,11 @@ object WeekBitmapRenderer {
         // ---- 時刻ラベル ----
         text.textAlign = Paint.Align.RIGHT
         text.typeface = Typeface.DEFAULT
-        text.textSize = dp(9f)
+        text.textSize = sz(9f)
         text.color = Palette.INK
-        val step = if (hourH < dp(11f)) 2 else 1
+        val step = if (hourH < sz(11f)) 2 else 1
         for (i in 0 until hours step step) {
-            cv.drawText("${Dates.START_HOUR + i}", axisW - dp(2f), top + hourH * i + dp(9f), text)
+            cv.drawText("${Dates.START_HOUR + i}", axisW - dp(2f), top + hourH * i + sz(9f), text)
         }
 
         // ---- 終日予定 ----
@@ -110,7 +118,7 @@ object WeekBitmapRenderer {
                 val y = headerH + dp(1.5f) + allDayRowH * j
                 val r = RectF(x + dp(1f), y, x + colW - dp(1f), y + allDayRowH - dp(1f))
                 drawEventBox(cv, r, ev.color, fill, ::dp)
-                drawClipped(cv, ev.title, r, dp(1.5f), dp(3.5f), eventText, singleLine = true)
+                drawClipped(cv, ev.title, r, dp(1.5f), dp(4f), eventText, singleLine = true)
             }
         }
 
@@ -123,10 +131,10 @@ object WeekBitmapRenderer {
                 if (b <= 0 || t >= Dates.RANGE_MIN) return@forEach
                 val cw = colW / s.ncols
                 val y1 = top + hourH * t / 60f
-                val y2 = maxOf(top + hourH * b / 60f, y1 + dp(12f))
+                val y2 = maxOf(top + hourH * b / 60f, y1 + sz(12f))
                 val r = RectF(x + cw * s.col + dp(1f), y1 + dp(0.5f), x + cw * (s.col + 1) - dp(1f), y2 - dp(0.5f))
                 drawEventBox(cv, r, s.event.color, fill, ::dp)
-                drawClipped(cv, s.event.title, r, dp(1.5f), dp(3.5f), eventText, singleLine = false)
+                drawClipped(cv, s.event.title, r, dp(1.5f), dp(4f), eventText, singleLine = false)
             }
         }
 

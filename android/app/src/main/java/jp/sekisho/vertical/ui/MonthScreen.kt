@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,7 +36,6 @@ import jp.sekisho.vertical.data.eventsForDay
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-private const val MAX_ITEMS = 3
 
 @Composable
 fun MonthScreen(
@@ -54,10 +55,15 @@ fun MonthScreen(
         (0L until 42L).map { start.plusDays(it) }.associateWith { eventsForDay(events, it) }
     }
 
+    BoxWithConstraints(modifier.fillMaxSize().padding(4.dp)) {
+    val scale = textScaleFor(maxWidth / 7)
+    // セルの高さに入るだけ予定を表示（1行 ≒ 文字サイズ10×拡大率×1.45）
+    val rowH = (maxHeight - (28f * scale).dp) / weeks
+    val maxItems = ((rowH - (34f * scale).dp) / (14.5f * scale).dp).toInt().coerceIn(1, 10)
+    CompositionLocalProvider(LocalTextScale provides scale) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
-            .padding(4.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(c(Palette.PAPER))
             .border(1.dp, c(Palette.LINE), RoundedCornerShape(6.dp)),
@@ -70,7 +76,7 @@ fun MonthScreen(
                     Modifier.weight(1f).background(c(Palette.headerBg(k))).bottomLine(c(Palette.accent(k))).padding(vertical = 5.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(Dates.dowJa(d), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = c(Palette.text(k)))
+                    Text(Dates.dowJa(d), fontSize = ssp(12f), fontWeight = FontWeight.Bold, color = c(Palette.text(k)))
                 }
             }
         }
@@ -95,38 +101,38 @@ fun MonthScreen(
                     ) {
                         val isToday = d == today
                         Box(
-                            Modifier.size(20.dp).clip(CircleShape).background(if (isToday) c(Palette.TODAY) else Color.Transparent),
+                            Modifier.size(sdp(20f)).clip(CircleShape).background(if (isToday) c(Palette.TODAY) else Color.Transparent),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 "${d.dayOfMonth}",
-                                fontSize = 12.sp,
+                                fontSize = ssp(12f),
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isToday) Color.White else c(Palette.numText(k)),
                             )
                         }
                         val items = de.allDay.map { it to true } + de.timed.map { it.event to false }
-                        items.take(MAX_ITEMS).forEach { (ev, allDay) ->
+                        items.take(maxItems).forEach { (ev, allDay) ->
                             if (allDay) {
                                 Text(
-                                    ev.title, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = c(Palette.EVENT_TEXT),
+                                    ev.title, fontSize = ssp(10f), fontWeight = FontWeight.SemiBold, color = c(Palette.EVENT_TEXT),
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).eventStyle(ev.color)
                                         .padding(start = 4.dp, end = 2.dp),
                                 )
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.size(3.dp, 11.dp).background(Color(ev.color)))
+                                    Box(Modifier.size(sdp(3f), sdp(12f)).background(Color(ev.color)))
                                     Spacer(Modifier.width(2.dp))
-                                    Text(ev.title, fontSize = 10.sp, color = c(Palette.EVENT_TEXT), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(ev.title, fontSize = ssp(10f), color = c(Palette.EVENT_TEXT), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
-                        if (items.size > MAX_ITEMS) Text("他${items.size - MAX_ITEMS}件", fontSize = 9.sp, color = c(Palette.SUB))
+                        if (items.size > maxItems) Text("他${items.size - maxItems}件", fontSize = ssp(9f), color = c(Palette.SUB))
                         val n = remember(d, taskVersion) { taskCount(d) }
                         if (n > 0) {
                             Spacer(Modifier.weight(1f))
-                            Text("☐ $n", fontSize = 9.sp, color = c(Palette.INK))
+                            Text("☐ $n", fontSize = ssp(9f), color = c(Palette.INK))
                         }
                     }
                 }
@@ -134,3 +140,5 @@ fun MonthScreen(
         }
     }
 }
+    }
+    }

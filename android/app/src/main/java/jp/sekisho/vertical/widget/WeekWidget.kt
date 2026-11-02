@@ -51,8 +51,6 @@ import jp.sekisho.vertical.ui.Palette
 import java.time.LocalDate
 import java.time.LocalTime
 
-private val TITLE_H = 28.dp
-private val TASK_ROW_H = 19.dp
 
 class WeekWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
@@ -85,8 +83,13 @@ private fun WidgetContent(version: Long) {
     }
     val tasks = remember(version, weekStart) { days.associateWith { taskRepo.tasks(it) } }
 
-    val tasksH = TASK_ROW_H * TaskRepository.PER_DAY + 4.dp
-    val imageH = (size.height - TITLE_H - tasksH).coerceAtLeast(60.dp)
+    // 広い画面（Galaxy Z Fold の内側画面など）では文字と行を大きくする
+    val ts = WeekBitmapRenderer.textScale(size.width.value)
+    val titleH = (28f * ts.coerceAtMost(1.3f)).dp
+    val rowH = (19f * ts).dp
+    val axisW = WeekBitmapRenderer.axisDp(size.width.value).dp
+    val tasksH = rowH * TaskRepository.PER_DAY + 4.dp
+    val imageH = (size.height - titleH - tasksH).coerceAtLeast(60.dp)
     // 画面の解像度どおりに描いて文字のぼやけを防ぐ（RGB_565 でメモリを節約）
     val scale = context.resources.displayMetrics.density.coerceAtMost(3.5f)
     val bitmap = remember(version, size, today, now.hour, now.minute / 15) {
@@ -97,18 +100,18 @@ private fun WidgetContent(version: Long) {
     Column(GlanceModifier.fillMaxSize().cornerRadius(12.dp).background(cp(Palette.PAPER))) {
         // タイトル行
         Row(
-            GlanceModifier.fillMaxWidth().height(TITLE_H).background(cp(Palette.BAR)).padding(horizontal = 8.dp),
+            GlanceModifier.fillMaxWidth().height(titleH).background(cp(Palette.BAR)).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 Dates.weekTitle(weekStart),
-                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = (13f * ts.coerceAtMost(1.3f)).sp, fontWeight = FontWeight.Bold),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight().clickable(openApp),
             )
             Text(
                 "⟳",
-                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = 14.sp),
+                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = (16f * ts.coerceAtMost(1.3f)).sp),
                 modifier = GlanceModifier.padding(horizontal = 6.dp).clickable(actionRunCallback<RefreshAction>()),
             )
         }
@@ -132,8 +135,8 @@ private fun WidgetContent(version: Long) {
         // タスク（各日5件・チェックで削除）
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(cp(Palette.LINE))) {}
         Row(GlanceModifier.fillMaxWidth().height(tasksH).padding(vertical = 2.dp)) {
-            Box(GlanceModifier.width(WeekBitmapRenderer.AXIS_DP.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("✓", style = TextStyle(color = cp(Palette.SUB), fontSize = 8.sp))
+            Box(GlanceModifier.width(axisW).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                Text("✓", style = TextStyle(color = cp(Palette.SUB), fontSize = (9f * ts).sp))
             }
             days.forEach { d ->
                 Column(GlanceModifier.defaultWeight().fillMaxHeight()) {
@@ -141,12 +144,12 @@ private fun WidgetContent(version: Long) {
                     for (i in 0 until TaskRepository.PER_DAY) {
                         val t = list.getOrNull(i)
                         Row(
-                            GlanceModifier.fillMaxWidth().height(TASK_ROW_H),
+                            GlanceModifier.fillMaxWidth().height(rowH),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (t != null) {
                                 Box(
-                                    GlanceModifier.size(TASK_ROW_H).clickable(
+                                    GlanceModifier.size(rowH).clickable(
                                         actionRunCallback<CompleteTaskAction>(
                                             actionParametersOf(KeyDate to d.toString(), KeyTaskId to t.id),
                                         ),
@@ -156,12 +159,12 @@ private fun WidgetContent(version: Long) {
                                     Image(
                                         provider = ImageProvider(R.drawable.ic_task_box),
                                         contentDescription = "完了",
-                                        modifier = GlanceModifier.size(12.dp),
+                                        modifier = GlanceModifier.size((12f * ts).dp),
                                     )
                                 }
                                 Text(
                                     t.text,
-                                    style = TextStyle(color = cp(Palette.INK), fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                                    style = TextStyle(color = cp(Palette.INK), fontSize = (10f * ts).sp, fontWeight = FontWeight.Medium),
                                     maxLines = 1,
                                     modifier = GlanceModifier.defaultWeight().clickable(openApp),
                                 )
