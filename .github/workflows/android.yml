@@ -7,6 +7,9 @@ on:
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,9 +30,22 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk vertical-techo.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: vertical-techo-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android/vertical-techo.apk
           if-no-files-found: error
+
+      # スマホから .apk を直接ダウンロードできるよう、Releases に最新版を置く
+      - name: Publish to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-apk
+          name: 最新APK（バーチカル手帳）
+          body: |
+            スマホでこのページを開き、下の Assets にある `vertical-techo.apk` をタップしてダウンロード・インストールしてください。
+            ビルド元コミット: ${{ github.sha }}
+          prerelease: true
+          files: android/vertical-techo.apk
