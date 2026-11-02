@@ -1,6 +1,7 @@
 package jp.sekisho.vertical.ui
 
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -20,4 +21,9 @@ fun Modifier.topLine(color: Color = c(Palette.LINE), width: Float = 1f) = drawBe
 fun Modifier.bottomLine(color: Color, width: Float = 2f) = drawBehind {
     val w = width.dp.toPx()
     drawLine(color, Offset(0f, size.height - w / 2), Offset(size.width, size.height - w / 2), w)
+}
+
+/** 予定の見た目：薄い背景＋左端に予定の色の帯 */
+fun Modifier.eventStyle(color: Int) = background(Color(Palette.eventBg(color))).drawBehind {
+    drawRect(Color(color), size = androidx.compose.ui.geometry.Size(2.5.dp.toPx(), size.height))
 }

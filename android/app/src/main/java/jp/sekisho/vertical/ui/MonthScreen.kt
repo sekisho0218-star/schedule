@@ -109,22 +109,24 @@ fun MonthScreen(
                         items.take(MAX_ITEMS).forEach { (ev, allDay) ->
                             if (allDay) {
                                 Text(
-                                    ev.title, fontSize = 9.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).background(Color(ev.color)).padding(horizontal = 2.dp),
+                                    ev.title, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = c(Palette.EVENT_TEXT),
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).eventStyle(ev.color)
+                                        .padding(start = 4.dp, end = 2.dp),
                                 )
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.width(3.dp).size(3.dp, 10.dp).background(Color(ev.color)))
+                                    Box(Modifier.size(3.dp, 11.dp).background(Color(ev.color)))
                                     Spacer(Modifier.width(2.dp))
-                                    Text(ev.title, fontSize = 9.sp, color = c(Palette.INK), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(ev.title, fontSize = 10.sp, color = c(Palette.EVENT_TEXT), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
-                        if (items.size > MAX_ITEMS) Text("他${items.size - MAX_ITEMS}件", fontSize = 8.sp, color = c(Palette.SUB))
+                        if (items.size > MAX_ITEMS) Text("他${items.size - MAX_ITEMS}件", fontSize = 9.sp, color = c(Palette.SUB))
                         val n = remember(d, taskVersion) { taskCount(d) }
                         if (n > 0) {
                             Spacer(Modifier.weight(1f))
-                            Text("☐ $n", fontSize = 8.sp, color = c(Palette.SUB))
+                            Text("☐ $n", fontSize = 9.sp, color = c(Palette.INK))
                         }
                     }
                 }

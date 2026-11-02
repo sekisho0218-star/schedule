@@ -51,8 +51,8 @@ import jp.sekisho.vertical.ui.Palette
 import java.time.LocalDate
 import java.time.LocalTime
 
-private val TITLE_H = 24.dp
-private val TASK_ROW_H = 17.dp
+private val TITLE_H = 28.dp
+private val TASK_ROW_H = 19.dp
 
 class WeekWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
@@ -87,7 +87,8 @@ private fun WidgetContent(version: Long) {
 
     val tasksH = TASK_ROW_H * TaskRepository.PER_DAY + 4.dp
     val imageH = (size.height - TITLE_H - tasksH).coerceAtLeast(60.dp)
-    val scale = context.resources.displayMetrics.density.coerceAtMost(2f)
+    // 画面の解像度どおりに描いて文字のぼやけを防ぐ（RGB_565 でメモリを節約）
+    val scale = context.resources.displayMetrics.density.coerceAtMost(3.5f)
     val bitmap = remember(version, size, today, now.hour, now.minute / 15) {
         WeekBitmapRenderer.render(size.width.value, imageH.value, scale, days, dayEvents, today, now)
     }
@@ -101,7 +102,7 @@ private fun WidgetContent(version: Long) {
         ) {
             Text(
                 Dates.weekTitle(weekStart),
-                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = 13.sp, fontWeight = FontWeight.Bold),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight().clickable(openApp),
             )
@@ -155,12 +156,12 @@ private fun WidgetContent(version: Long) {
                                     Image(
                                         provider = ImageProvider(R.drawable.ic_task_box),
                                         contentDescription = "完了",
-                                        modifier = GlanceModifier.size(10.dp),
+                                        modifier = GlanceModifier.size(12.dp),
                                     )
                                 }
                                 Text(
                                     t.text,
-                                    style = TextStyle(color = cp(Palette.INK), fontSize = 9.sp),
+                                    style = TextStyle(color = cp(Palette.INK), fontSize = 10.sp, fontWeight = FontWeight.Medium),
                                     maxLines = 1,
                                     modifier = GlanceModifier.defaultWeight().clickable(openApp),
                                 )

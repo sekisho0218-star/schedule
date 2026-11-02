@@ -64,7 +64,7 @@ import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
 
-private val AXIS_W = 26.dp
+private val AXIS_W = 24.dp
 private val TASK_ROW_H = 24.dp
 private val HOURS = Dates.END_HOUR - Dates.START_HOUR
 
@@ -115,13 +115,14 @@ fun WeekScreen(
                     list.take(3).forEach { ev ->
                         Text(
                             ev.title,
-                            fontSize = 9.sp,
-                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = c(Palette.EVENT_TEXT),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(3.dp))
-                                .background(Color(ev.color)).clickable { onEventClick(ev) }
-                                .padding(horizontal = 2.dp),
+                                .eventStyle(ev.color).clickable { onEventClick(ev) }
+                                .padding(start = 4.dp, end = 2.dp),
                         )
                     }
                     if (list.size > 3) Text("+${list.size - 3}", fontSize = 8.sp, color = c(Palette.SUB))
@@ -198,8 +199,8 @@ private fun TimeAxis(hourH: Dp) {
         for (i in 0 until HOURS) {
             Text(
                 "${Dates.START_HOUR + i}",
-                fontSize = 9.sp,
-                color = c(Palette.SUB),
+                fontSize = 10.sp,
+                color = c(Palette.INK),
                 modifier = Modifier.offset(y = hourH * i).width(AXIS_W - 3.dp).padding(top = 1.dp),
                 style = TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.End),
             )
@@ -257,15 +258,15 @@ private fun DayTimeline(
                     .height(h)
                     .padding(1.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(Color(s.event.color))
+                    .eventStyle(s.event.color)
                     .clickable { onEventClick(s.event) }
-                    .padding(horizontal = 2.dp, vertical = 1.dp),
+                    .padding(start = 4.dp, end = 1.dp, top = 1.dp),
             ) {
                 Text(
                     s.event.title,
-                    fontSize = 9.sp,
-                    lineHeight = 10.sp,
-                    color = Color.White,
+                    fontSize = 10.sp,
+                    lineHeight = 11.sp,
+                    color = c(Palette.EVENT_TEXT),
                     fontWeight = FontWeight.SemiBold,
                     overflow = TextOverflow.Clip,
                 )
@@ -334,7 +335,8 @@ private fun TaskRow(task: Task, modifier: Modifier, onComplete: () -> Unit, onEd
         }
         Text(
             task.text,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
             color = c(Palette.INK),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -357,7 +359,7 @@ private fun EmptyTaskRow(modifier: Modifier, onAdd: (String) -> Unit) {
         value = text,
         onValueChange = { text = it },
         singleLine = true,
-        textStyle = TextStyle(fontSize = 10.sp, color = c(Palette.INK)),
+        textStyle = TextStyle(fontSize = 11.sp, color = c(Palette.INK)),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { commit() }),
         modifier = modifier.onFocusChanged { if (!it.isFocused) commit() },

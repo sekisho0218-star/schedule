@@ -26,6 +26,18 @@ object Palette {
     const val SUN_BG = 0xFFFDECEA.toInt()
     const val SUN_TINT = 0xFFFDF3F1.toInt()
 
+    /** 予定ブロックの文字色（薄い背景の上で読みやすい濃い色） */
+    const val EVENT_TEXT = 0xFF1A1A1A.toInt()
+
+    /** 予定の色を白に寄せた背景色（ratio = 白の割合） */
+    fun eventBg(color: Int, ratio: Float = 0.5f): Int {
+        fun ch(shift: Int): Int {
+            val v = (color shr shift) and 0xFF
+            return (v + (255 - v) * ratio).toInt().coerceIn(0, 255)
+        }
+        return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+    }
+
     fun accent(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY; DayKind.SATURDAY -> SAT; DayKind.SUNDAY -> SUN }
     fun headerBg(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY_BG; DayKind.SATURDAY -> SAT_BG; DayKind.SUNDAY -> SUN_BG }
     fun text(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY_TEXT; DayKind.SATURDAY -> SAT; DayKind.SUNDAY -> SUN }
