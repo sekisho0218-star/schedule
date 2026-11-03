@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import jp.sekisho.vertical.data.CalEvent
 import jp.sekisho.vertical.data.CalendarInfo
 import jp.sekisho.vertical.data.CalendarRepository
+import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
 import jp.sekisho.vertical.data.EventDraft
 import jp.sekisho.vertical.data.Prefs
@@ -39,6 +40,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var hasPermission by mutableStateOf(calendarRepo.hasReadPermission()); private set
     var defaultCalendarId by mutableStateOf(prefs.defaultCalendarId); private set
     var message by mutableStateOf<String?>(null)
+    var tasksGoogle by mutableStateOf(taskRepo.googleMode); private set
+    var tasksConnecting by mutableStateOf(false); private set
 
     private var loadJob: Job? = null
     private var observerRegistered = false
@@ -52,6 +55,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         registerObserver()
         reload()
+        viewModelScope.launch { DataSignals.errors.collect { message = it } }
     }
 
     private fun registerObserver() {
@@ -82,6 +86,32 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             events = ev
             calendars = cals
         }
+        if (taskRepo.googleMode) viewModelScope.launch { taskRepo.refresh(from, to) }
+    }
+
+    /** Google ToDo リストへの接続が許可された */
+    fun onTasksAuthorized(token: String?) {
+        if (token == null) {
+            message = "Google ToDo リストに接続できませんでした"
+            return
+        }
+        tasksConnecting = true
+        viewModelScope.launch {
+            val r = taskRepo.enableGoogle(token)
+            tasksConnecting = false
+            tasksGoogle = taskRepo.googleMode
+            message = r.fold(
+                { n -> if (n > 0) "Google ToDo リストと同期しました（端末のタスク${n}件を移動）" else "Google ToDo リストと同期しました" },
+                { "Google ToDo リストに接続できませんでした：${it.message}" },
+            )
+            reload()
+        }
+    }
+
+    fun disconnectTasks() {
+        taskRepo.disableGoogle()
+        tasksGoogle = false
+        message = "タスクの同期を解除しました（以後は端末内に保存）"
     }
 
     fun move(dir: Int) {

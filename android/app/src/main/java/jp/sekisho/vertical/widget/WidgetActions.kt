@@ -6,6 +6,7 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
 import jp.sekisho.vertical.data.CalendarRepository
 import jp.sekisho.vertical.data.DataSignals
+import jp.sekisho.vertical.data.Dates
 import jp.sekisho.vertical.data.TaskRepository
 import java.time.LocalDate
 
@@ -17,7 +18,7 @@ class CompleteTaskAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val date = parameters[KeyDate] ?: return
         val id = parameters[KeyTaskId] ?: return
-        TaskRepository(context).complete(LocalDate.parse(date), id)
+        TaskRepository(context).completeAndWait(LocalDate.parse(date), id)
         WeekWidget().update(context, glanceId)
     }
 }
@@ -26,6 +27,8 @@ class CompleteTaskAction : ActionCallback {
 class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         CalendarRepository(context).requestSync()
+        val week = Dates.weekStart(LocalDate.now())
+        TaskRepository(context).refresh(week, week.plusDays(7))
         DataSignals.bump()
         WeekWidget().update(context, glanceId)
     }

@@ -2,6 +2,7 @@ package jp.sekisho.vertical.ui
 
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,12 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,8 +47,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
+import jp.sekisho.vertical.data.GoogleAuth
 import jp.sekisho.vertical.data.Task
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.math.abs
@@ -59,6 +64,23 @@ fun MainScreen(vm: MainViewModel) {
         permLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
     }
     LaunchedEffect(Unit) { if (!vm.hasPermission) requestPermission() }
+
+    // Google ToDo リストへの接続（初回は Google の許可画面が開く）
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        vm.onTasksAuthorized(GoogleAuth.tokenFromIntent(context, res.data))
+    }
+    val connectTasks: () -> Unit = {
+        scope.launch {
+            when (val r = GoogleAuth.authorize(context)) {
+                is GoogleAuth.Result.Token -> vm.onTasksAuthorized(r.token)
+                is GoogleAuth.Result.NeedsConsent ->
+                    authLauncher.launch(IntentSenderRequest.Builder(r.pendingIntent.intentSender).build())
+                is GoogleAuth.Result.Error -> vm.message = r.message
+            }
+        }
+    }
     LifecycleResumeEffect(Unit) {
         vm.reload()
         onPauseOrDispose { }
@@ -162,6 +184,10 @@ fun MainScreen(vm: MainViewModel) {
             calendars = vm.calendars,
             selectedId = vm.defaultCalendar()?.id,
             onSelect = vm::setDefaultCalendar,
+            tasksGoogle = vm.tasksGoogle,
+            tasksConnecting = vm.tasksConnecting,
+            onConnectTasks = connectTasks,
+            onDisconnectTasks = vm::disconnectTasks,
             onDismiss = { showSettings = false },
         )
     }

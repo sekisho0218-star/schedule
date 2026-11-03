@@ -13,4 +13,9 @@ class Prefs(context: Context) {
     var viewMode: String
         get() = sp.getString("viewMode", "WEEK") ?: "WEEK"
         set(v) = sp.edit().putString("viewMode", v).apply()
+
+    /** タスクを Google ToDo リストと同期する */
+    var tasksGoogle: Boolean
+        get() = sp.getBoolean("tasksGoogle", false)
+        set(v) = sp.edit().putBoolean("tasksGoogle", v).commit().let { }
 }

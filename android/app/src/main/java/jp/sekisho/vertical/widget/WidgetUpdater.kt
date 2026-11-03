@@ -12,11 +12,14 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import jp.sekisho.vertical.data.DataSignals
+import jp.sekisho.vertical.data.Dates
+import jp.sekisho.vertical.data.TaskRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.time.Duration
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 object WidgetUpdater {
@@ -36,8 +39,8 @@ object WidgetUpdater {
         val wm = WorkManager.getInstance(context)
         wm.enqueueUniquePeriodicWork(
             PERIODIC,
-            ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<WidgetRefreshWorker>(30, TimeUnit.MINUTES).build(),
+            ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<WidgetRefreshWorker>(15, TimeUnit.MINUTES).build(),
         )
         watchCalendar(context, ExistingWorkPolicy.KEEP)
     }
@@ -63,6 +66,9 @@ object WidgetUpdater {
 
 class WidgetRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        // Google ToDo リストで他の端末（PCなど）から変更されたタスクを取り込む
+        val week = Dates.weekStart(LocalDate.now())
+        TaskRepository(applicationContext).refresh(week, week.plusDays(7))
         DataSignals.bump()
         WeekWidget().updateAll(applicationContext)
         return Result.success()

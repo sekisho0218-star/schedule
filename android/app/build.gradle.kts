@@ -12,8 +12,8 @@ android {
         applicationId = "jp.sekisho.vertical"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "2.0.0"
     }
 
     signingConfigs {
@@ -66,6 +66,10 @@ dependencies {
     // ホーム画面ウィジェット
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.glance:glance-material3:1.1.1")
+    // Google ToDo リスト（Google Tasks API）へのログイン
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
     // ウィジェットの定期更新・カレンダー変更検知
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 }

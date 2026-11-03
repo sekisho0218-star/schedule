@@ -245,6 +245,10 @@ fun SettingsDialog(
     calendars: List<CalendarInfo>,
     selectedId: Long?,
     onSelect: (Long) -> Unit,
+    tasksGoogle: Boolean,
+    tasksConnecting: Boolean,
+    onConnectTasks: () -> Unit,
+    onDisconnectTasks: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val writable = calendars.filter { it.writable }
@@ -278,6 +282,22 @@ fun SettingsDialog(
                     "予定は端末に登録された Google アカウントを通して Google カレンダーと自動で同期されます。「⟳」で今すぐ同期できます。",
                     fontSize = 12.sp, color = c(Palette.SUB), modifier = Modifier.padding(top = 10.dp),
                 )
+
+                Text("タスクの同期", fontSize = 14.sp, modifier = Modifier.padding(top = 18.dp))
+                Text(
+                    if (tasksGoogle) "Google ToDo リストと同期中です。PC版や Google カレンダーと同じタスクが表示されます。"
+                    else "タスクはこの端末にだけ保存されています。同期すると PC版と同じタスクを使えます（今あるタスクは Google に移動します）。",
+                    fontSize = 12.sp, color = c(Palette.SUB), modifier = Modifier.padding(top = 4.dp),
+                )
+                Row(Modifier.padding(top = 6.dp)) {
+                    if (tasksConnecting) {
+                        Text("接続中…", fontSize = 13.sp)
+                    } else if (tasksGoogle) {
+                        OutlinedButton(onClick = onDisconnectTasks) { Text("同期を解除") }
+                    } else {
+                        OutlinedButton(onClick = onConnectTasks) { Text("Google ToDo リストと同期") }
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
