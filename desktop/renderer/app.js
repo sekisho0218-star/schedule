@@ -39,6 +39,27 @@ function parseTaskTime(text) {
 }
 const untimed = (list) => (list || []).filter((t) => !parseTaskTime(t.text));
 
+/*
+ * Google ToDo リストで日時を設定したタスクは、カレンダー側に時刻付きの予定として表示される
+ * （Tasks API からは時刻が読めない）。同じ日に同じ名前の時刻付き予定があるタスクは
+ * スケジュールにだけ表示し（「☐」を付けてクリックで完了）、タスクリストからは外す。
+ */
+const normTitle = (s) => s.replace(/\u3000/g, ' ').trim().toLowerCase();
+function linkTasks(date, dayEvents) {
+  const list = untimed(state.tasks[date]);
+  const byTitle = new Map(list.map((t) => [normTitle(t.text), t]));
+  const linked = new Set();
+  for (const it of dayEvents.timed) {
+    if (it.ev.task) continue;
+    const t = byTitle.get(normTitle(it.ev.title));
+    if (t && !linked.has(t.id)) {
+      linked.add(t.id);
+      it.ev = { ...it.ev, title: '☐ ' + it.ev.title, task: t, taskDate: date };
+    }
+  }
+  return list.filter((t) => !linked.has(t.id));
+}
+
 /** 時刻付きタスクを、スケジュールに並べる予定の形にする */
 function taskEvents() {
   const out = [];
@@ -155,6 +176,9 @@ function renderWeek(root) {
 
   grid.append(el('div', 'axis-label', '終日'));
   const per = days.map(eventsOn);
+  // タスクリストに出すタスク（スケジュールに表示済みのものを除く）
+  state.listTasks = {};
+  days.forEach((d, i) => { state.listTasks[ymd(d)] = linkTasks(ymd(d), per[i]); });
   days.forEach((d, i) => {
     const cell = el('div', 'allday');
     for (const ev of per[i].allDay) {
@@ -256,7 +280,7 @@ function fitTimeline(scroll) {
 
 function renderTasks(cell, focusEmpty = false) {
   const date = cell.dataset.date;
-  const tasks = untimed(state.tasks[date]).slice(0, TASKS_PER_DAY);
+  const tasks = (state.listTasks?.[date] || untimed(state.tasks[date])).slice(0, TASKS_PER_DAY);
   cell.replaceChildren();
   let firstEmpty = null;
   for (let i = 0; i < TASKS_PER_DAY; i++) {
@@ -272,6 +296,7 @@ function renderTasks(cell, focusEmpty = false) {
         row.classList.add('done');
         setTimeout(async () => {
           state.tasks[date] = (state.tasks[date] || []).filter((x) => x.id !== t.id);
+          if (state.listTasks?.[date]) state.listTasks[date] = state.listTasks[date].filter((x) => x.id !== t.id);
           renderTasks(cell);
           await call(api.completeTask(t.id), 'タスクを完了にできませんでした').catch(() => loadTasks());
         }, 400);
@@ -287,6 +312,7 @@ function renderTasks(cell, focusEmpty = false) {
         committed = true;
         const temp = { id: 'tmp-' + Date.now(), text: v };
         (state.tasks[date] ||= []).push(temp);
+        if (state.listTasks?.[date] && !parseTaskTime(v)) state.listTasks[date].push(temp);
         // 時刻付き（「15:00 〇〇」）はスケジュールに出るので画面全体を描き直す
         const timed = !!parseTaskTime(v);
         const redraw = (focus) => (timed ? render() : renderTasks(cell, focus));
@@ -297,6 +323,7 @@ function renderTasks(cell, focusEmpty = false) {
           redraw(false);
         } catch {
           state.tasks[date] = state.tasks[date].filter((x) => x !== temp);
+          if (state.listTasks?.[date]) state.listTasks[date] = state.listTasks[date].filter((x) => x !== temp);
           redraw(false);
         }
       };
@@ -329,7 +356,9 @@ function renderMonth(root) {
     const d = addDays(gridStart, i);
     const cell = el('div', `mcell ${dayKind(d)}${d.getMonth() !== first.getMonth() ? ' other' : ''}${sameDay(d, today) ? ' today' : ''}`);
     cell.append(el('div', 'mnum', d.getDate()));
-    const { allDay, timed } = eventsOn(d);
+    const dayEv = eventsOn(d);
+    const listForDay = linkTasks(ymd(d), dayEv);
+    const { allDay, timed } = dayEv;
     const items = [...allDay.map((ev) => ({ ev, label: ev.title, cls: 'allday' })), ...timed.map(({ ev }) => ({ ev, label: ev.title, cls: '' }))];
     for (const it of items.slice(0, maxItems)) {
       const m = el('div', `mitem ${it.cls}`, it.label); styleEvent(m, it.ev); m.title = it.label;
@@ -337,7 +366,7 @@ function renderMonth(root) {
       cell.append(m);
     }
     if (items.length > maxItems) cell.append(el('div', 'mmore', `他${items.length - maxItems}件`));
-    const n = untimed(state.tasks[ymd(d)]).length;
+    const n = listForDay.length;
     if (n) cell.append(el('div', 'mtasks', `☐ タスク${n}`));
     cell.addEventListener('click', () => { state.anchor = d; setView('week'); });
     grid.append(cell);

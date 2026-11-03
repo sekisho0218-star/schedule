@@ -63,6 +63,7 @@ import jp.sekisho.vertical.data.Task
 import jp.sekisho.vertical.data.TaskRepository
 import jp.sekisho.vertical.data.TimedSlot
 import jp.sekisho.vertical.data.eventsForDay
+import jp.sekisho.vertical.data.linkTasks
 import jp.sekisho.vertical.data.taskEvents
 import jp.sekisho.vertical.data.untimedTasks
 import kotlinx.coroutines.delay
@@ -89,10 +90,12 @@ fun WeekScreen(
 ) {
     val days = remember(weekStart) { (0L..6L).map { weekStart.plusDays(it) } }
     // 予定に、時刻付きタスク（「15:00 〇〇」）を加えてスケジュールに並べる
-    val dayEvents = remember(events, weekStart, taskVersion) {
+    // さらに、日時を設定したタスク（カレンダーに同じ名前の時刻付き予定がある）はスケジュールにだけ表示
+    val linked = remember(events, weekStart, taskVersion) {
         val all = events + days.flatMap { taskEvents(it, tasksOf(it)) }
-        days.associateWith { eventsForDay(all, it) }
+        days.associateWith { linkTasks(it, tasksOf(it), eventsForDay(all, it)) }
     }
+    val dayEvents = linked.mapValues { it.value.first }
     // スケジュール上のタスクをタップ → タスクの編集（完了）、予定をタップ → 予定の編集
     val onItemClick: (CalEvent) -> Unit = { ev ->
         val id = ev.taskId
@@ -178,7 +181,7 @@ fun WeekScreen(
                         key(d, taskVersion) {
                             TaskCell(
                                 date = d,
-                                tasks = untimedTasks(tasksOf(d)),
+                                tasks = linked.getValue(d).second,
                                 onAdd = { onAddTask(d, it) },
                                 onComplete = { onCompleteTask(d, it) },
                                 onEdit = { onEditTask(d, it) },

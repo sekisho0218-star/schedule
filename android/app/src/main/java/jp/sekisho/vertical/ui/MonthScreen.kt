@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import jp.sekisho.vertical.data.CalEvent
 import jp.sekisho.vertical.data.Dates
 import jp.sekisho.vertical.data.eventsForDay
+import jp.sekisho.vertical.data.linkTasks
 import jp.sekisho.vertical.data.taskEvents
 import jp.sekisho.vertical.data.untimedTasks
 import java.time.LocalDate
@@ -58,7 +59,7 @@ fun MonthScreen(
     val perDay = remember(events, start, taskVersion) {
         val days = (0L until 42L).map { start.plusDays(it) }
         val all = events + days.flatMap { taskEvents(it, tasksOf(it)) }
-        days.associateWith { eventsForDay(all, it) }
+        days.associateWith { linkTasks(it, tasksOf(it), eventsForDay(all, it)) }
     }
 
     BoxWithConstraints(modifier.fillMaxSize().padding(4.dp)) {
@@ -92,7 +93,7 @@ fun MonthScreen(
                     val d = start.plusDays((w * 7 + i).toLong())
                     val k = Dates.kind(d)
                     val other = d.month != first.month
-                    val de = perDay.getValue(d)
+                    val de = perDay.getValue(d).first
                     Column(
                         Modifier
                             .weight(1f)
@@ -134,7 +135,7 @@ fun MonthScreen(
                             }
                         }
                         if (items.size > maxItems) Text("他${items.size - maxItems}件", fontSize = ssp(9f), color = c(Palette.SUB))
-                        val n = remember(d, taskVersion) { untimedTasks(tasksOf(d)).size }
+                        val n = perDay.getValue(d).second.size
                         if (n > 0) {
                             Spacer(Modifier.weight(1f))
                             Text("☐ $n", fontSize = ssp(9f), color = c(Palette.INK))

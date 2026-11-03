@@ -62,3 +62,29 @@ fun taskEvents(date: java.time.LocalDate, tasks: List<Task>): List<CalEvent> = t
 
 /** タスクリストに表示する（時刻のない）タスク */
 fun untimedTasks(tasks: List<Task>): List<Task> = tasks.filterNot { TaskTime.isTimed(it.text) }
+
+/** 名前の比較用（前後の空白・全角空白・大文字小文字の違いを無視） */
+private fun normTitle(s: String) = s.replace('　', ' ').trim().lowercase()
+
+/**
+ * Google ToDo リストで日時を設定したタスクは、カレンダー側に時刻付きの予定として表示される
+ * （Tasks API からは時刻が読めない）。同じ日に同じ名前の時刻付き予定があるタスクは
+ * 「スケジュールに表示済み」とみなし、タスクリストからは外して、予定の方に「☐」を付けて完了できるようにする。
+ *
+ * @return スケジュール（リンク済み）と、タスクリストに出すタスク
+ */
+fun linkTasks(date: java.time.LocalDate, tasks: List<Task>, day: DayEvents): Pair<DayEvents, List<Task>> {
+    val list = untimedTasks(tasks)
+    val byTitle = list.associateBy { normTitle(it.text) }
+    val linked = mutableSetOf<String>()
+    val timed = day.timed.map { s ->
+        val t = if (s.event.taskId == null) byTitle[normTitle(s.event.title)] else null
+        if (t != null && t.id !in linked) {
+            linked += t.id
+            s.copy(event = s.event.copy(title = "☐ " + s.event.title, taskId = t.id, taskDate = date))
+        } else {
+            s
+        }
+    }
+    return DayEvents(day.allDay, timed) to list.filterNot { it.id in linked }
+}

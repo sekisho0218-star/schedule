@@ -47,6 +47,7 @@ import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
 import jp.sekisho.vertical.data.TaskRepository
 import jp.sekisho.vertical.data.eventsForDay
+import jp.sekisho.vertical.data.linkTasks
 import jp.sekisho.vertical.data.taskEvents
 import jp.sekisho.vertical.data.untimedTasks
 import jp.sekisho.vertical.ui.Palette
@@ -84,12 +85,14 @@ private fun WidgetContent(version: Long) {
     val hasPermission = calendarRepo.hasReadPermission()
     val allTasks = remember(version, weekStart) { days.associateWith { taskRepo.tasks(it) } }
     // 時刻付きタスク（「15:00 〇〇」）はスケジュールに、時刻のないタスクはタスク欄に
-    val dayEvents = remember(version, weekStart) {
+    // 日時を設定したタスク（同じ名前の時刻付き予定がある）はスケジュールにだけ表示
+    val linked = remember(version, weekStart) {
         val ev = calendarRepo.instances(weekStart, weekStart.plusDays(7)) +
             days.flatMap { taskEvents(it, allTasks.getValue(it)) }
-        days.associateWith { eventsForDay(ev, it) }
+        days.associateWith { linkTasks(it, allTasks.getValue(it), eventsForDay(ev, it)) }
     }
-    val tasks = allTasks.mapValues { untimedTasks(it.value) }
+    val dayEvents = linked.mapValues { it.value.first }
+    val tasks = linked.mapValues { it.value.second }
 
     // 広い画面（Galaxy Z Fold の内側画面など）では文字と行を大きくする
     val ts = WeekBitmapRenderer.textScale(size.width.value)
@@ -144,7 +147,7 @@ private fun WidgetContent(version: Long) {
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(cp(Palette.LINE))) {}
         Row(GlanceModifier.fillMaxWidth().height(tasksH)) {
             Box(GlanceModifier.width(axisW).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("TASK", style = TextStyle(color = cp(Palette.SUB), fontSize = (8f * ts).sp))
+                Text("TASK", style = TextStyle(color = cp(Palette.SUB), fontSize = (7f * ts).sp), maxLines = 1)
             }
             days.forEach { d ->
               // Glance の Row は子要素10個までなので、罫線と1日分の列をまとめる
