@@ -46,6 +46,7 @@ async function call(promise, errorPrefix) {
   if (r.needLogin) {
     state.app = await api.state();
     render();
+    throw new Error(r.error);
   }
   toast(errorPrefix ? `${errorPrefix}：${r.error}` : r.error, 5000);
   throw new Error(r.error);
@@ -278,6 +279,31 @@ function renderMonth(root) {
   root.append(grid);
 }
 
+/* ---------- ログインの期限切れ ---------- */
+function renderExpired(root) {
+  $('#title').textContent = 'バーチカル手帳';
+  const box = el('div', 'setup');
+  const waiting = state.app.signingIn;
+  box.innerHTML = `<h2>Google へのログインが必要です</h2>
+    <p>ログインの有効期限（7日）が切れました。${waiting
+      ? '<b>ブラウザに Google のログイン画面を開きました。</b>アカウントを選んで「続行」を押すと、自動で表示が戻ります。'
+      : 'ボタンを押すと、ブラウザに Google のログイン画面が開きます。'}</p>
+    <p class="hint">「Google はこのアプリを確認していません」と表示されたら「続行」を選んでください。</p>`;
+  const b = el('button', null, waiting ? 'ログイン画面をもう一度開く' : 'Google にログイン');
+  b.addEventListener('click', signIn);
+  box.append(b);
+  root.append(box);
+}
+
+async function signIn() {
+  toast('ブラウザで Google にログインしてください…', 8000);
+  try {
+    state.app = await call(api.signIn(), 'ログインできませんでした');
+    toast('ログインしました');
+    render(); reload();
+  } catch { /* toast 済み */ }
+}
+
 /* ---------- 初期設定の案内 ---------- */
 function renderSetup(root) {
   $('#title').textContent = 'バーチカル手帳';
@@ -298,7 +324,8 @@ function render() {
   const root = $('#view');
   root.replaceChildren();
   const ready = state.app?.signedIn;
-  if (!ready) renderSetup(root);
+  if (!ready && state.app?.expired) renderExpired(root);
+  else if (!ready) renderSetup(root);
   else if (state.view === 'month') renderMonth(root);
   else renderWeek(root);
   $('#tab-week').classList.toggle('active', state.view === 'week');
@@ -497,12 +524,7 @@ function bind() {
     state.app = await api.saveClient({ clientId: sf.clientId.value, clientSecret: sf.clientSecret.value });
     if (!state.app.hasClient) { toast('クライアントシークレットを入力してください'); return; }
     $('#settings-dialog').close();
-    toast('ブラウザで Google にログインしてください…', 8000);
-    try {
-      state.app = await call(api.signIn(), 'ログインできませんでした');
-      toast('ログインしました');
-      render(); reload();
-    } catch { /* toast 済み */ }
+    signIn();
   });
   $('#btn-signout').addEventListener('click', async () => {
     state.app = await api.signOut(); state.events = []; state.tasks = {};

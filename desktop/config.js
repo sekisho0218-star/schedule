@@ -9,6 +9,7 @@ const defaults = {
   clientId: '',
   clientSecret: '',
   refreshToken: '', // 暗号化済み（base64）
+  wasSignedIn: false, // 一度ログインしたことがある（期限切れのとき自動でログイン画面を開くため）
   mode: 'desktop', // 'desktop' = デスクトップに貼り付け / 'top' = 常に手前
   locked: false,
   opacity: 1,

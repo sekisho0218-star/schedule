@@ -161,6 +161,7 @@ main { flex: 1; min-height: 0; padding: 6px; display: flex; flex-direction: colu
 /* ---------- 初期設定の案内 ---------- */
 .setup { margin: auto; max-width: 520px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 24px; line-height: 1.7; }
 .setup h2 { margin-top: 0; }
+.setup .hint { margin-bottom: 14px; }
 .setup button { padding: 8px 16px; border-radius: 6px; border: 0; background: var(--bar); color: #fff; }
 
 /* ---------- ダイアログ ---------- */

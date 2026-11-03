@@ -7,6 +7,8 @@ const google = require('./google');
 let win = null;
 let tray = null;
 let quitting = false;
+let signingIn = null; // 実行中のログイン（Promise）
+let autoPrompted = false; // 期限切れで自動的にログイン画面を開いたか
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -58,6 +60,7 @@ function start() {
   win.once('ready-to-show', () => {
     applyWindowSettings();
     win.showInactive();
+    if (publicState().expired) setTimeout(promptReLogin, 1500);
   });
 
   // 位置・大きさを保存
@@ -113,6 +116,8 @@ function publicState() {
     hasClient: !!(cfg.clientId && cfg.clientSecret),
     clientId: cfg.clientId,
     signedIn: google.isSignedIn(),
+    expired: !google.isSignedIn() && !!cfg.wasSignedIn && !!(cfg.clientId && cfg.clientSecret),
+    signingIn: !!signingIn,
     mode: cfg.mode,
     locked: cfg.locked,
     opacity: cfg.opacity,
@@ -161,12 +166,44 @@ function updateTrayMenu() {
 
 /* ---------------- 画面（renderer）とのやりとり ---------------- */
 
+/** Google ログイン（同時に1つだけ）。終わったら画面に知らせて再読み込みさせる */
+function runSignIn() {
+  if (signingIn) {
+    google.reopenSignIn();
+    return signingIn;
+  }
+  signingIn = google.signIn()
+    .then(() => { autoPrompted = false; showWindow(); })
+    .finally(() => {
+      signingIn = null;
+      if (win) {
+        win.webContents.send('state', publicState());
+        if (google.isSignedIn()) win.webContents.send('refresh');
+      }
+    });
+  win?.webContents.send('state', publicState());
+  return signingIn;
+}
+
+/**
+ * ログインの期限切れ（Google Cloud の「テスト」モードでは7日）を検知したら、
+ * 自動でブラウザに Google のログイン画面を開く（期限切れ1回につき1度だけ）
+ */
+function promptReLogin() {
+  const cfg = config.load();
+  if (autoPrompted || signingIn || !cfg.wasSignedIn || !cfg.clientId || !cfg.clientSecret) return;
+  autoPrompted = true;
+  runSignIn().catch(() => { /* キャンセル時は画面の「ログイン」ボタンから再試行 */ });
+}
+
 /** エラーを画面側で扱える形に変換 */
 const wrap = (fn) => async (_e, ...args) => {
   try {
     return { ok: true, data: await fn(...args) };
   } catch (err) {
-    return { ok: false, error: err.message, needLogin: err.code === 'NEED_LOGIN' };
+    const needLogin = err.code === 'NEED_LOGIN';
+    if (needLogin) promptReLogin();
+    return { ok: false, error: err.message, needLogin };
   }
 };
 
@@ -183,7 +220,7 @@ ipcMain.handle('save-client', (_e, { clientId, clientSecret }) => {
   if (changed) google.signOut();
   return publicState();
 });
-ipcMain.handle('sign-in', wrap(async () => { await google.signIn(); showWindow(); return publicState(); }));
+ipcMain.handle('sign-in', wrap(async () => { await runSignIn(); return publicState(); }));
 ipcMain.handle('sign-out', () => { google.signOut(); return publicState(); });
 ipcMain.handle('list-events', wrap((from, to) => google.listEvents(from, to)));
 ipcMain.handle('create-event', wrap((ev) => google.createEvent(ev)));

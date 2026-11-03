@@ -22,6 +22,7 @@ class NeedLoginError extends Error {
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 let access = null; // { token, expiresAt }
+let pendingAuthUrl = ''; // ログイン待ちの間、同じ画面を開き直すため
 let eventColors = null;
 
 function isSignedIn() {
@@ -84,8 +85,9 @@ async function signIn() {
       if (ok) resolve(u.searchParams.get('code'));
       else reject(new Error(u.searchParams.get('error') || 'ログインがキャンセルされました'));
     });
+    pendingAuthUrl = authUrl;
     shell.openExternal(authUrl);
-  });
+  }).finally(() => { pendingAuthUrl = ''; });
 
   const tok = await tokenRequest({
     client_id: clientId,
@@ -97,10 +99,12 @@ async function signIn() {
   });
   if (!tok.refresh_token) throw new Error('リフレッシュトークンを取得できませんでした。もう一度お試しください');
   config.setRefreshToken(tok.refresh_token);
+  config.save({ wasSignedIn: true });
   access = { token: tok.access_token, expiresAt: Date.now() + tok.expires_in * 1000 };
 }
 
 function signOut() {
+  config.save({ wasSignedIn: false });
   const rt = config.getRefreshToken();
   if (rt) fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(rt), { method: 'POST' }).catch(() => {});
   config.setRefreshToken('');
@@ -236,8 +240,14 @@ const addTask = (date, text) => api('POST', TASKS, { title: text, due: `${date}T
 const updateTask = (id, text) => api('PATCH', `${TASKS}/${encodeURIComponent(id)}`, { title: text });
 const completeTask = (id) => api('PATCH', `${TASKS}/${encodeURIComponent(id)}`, { status: 'completed' });
 
+/** ログイン待ちならブラウザのログイン画面を開き直す */
+function reopenSignIn() {
+  if (pendingAuthUrl) shell.openExternal(pendingAuthUrl);
+  return !!pendingAuthUrl;
+}
+
 module.exports = {
-  isSignedIn, signIn, signOut,
+  isSignedIn, signIn, signOut, reopenSignIn,
   listEvents, createEvent, updateEvent, deleteEvent,
   listTasks, addTask, updateTask, completeTask,
 };
