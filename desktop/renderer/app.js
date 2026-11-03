@@ -1,4 +1,6 @@
 // バーチカル手帳（Windows 版）画面
+// window.api（preload で公開）とトップレベルの名前がぶつからないよう、全体を関数で囲む
+(() => {
 const api = window.api;
 
 /* ---------- 日付（月曜始まり・ローカル時刻） ---------- */
@@ -555,4 +557,5 @@ function bind() {
   bind();
   render();
   reload();
+})();
 })();
