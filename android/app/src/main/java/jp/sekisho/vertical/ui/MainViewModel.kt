@@ -102,7 +102,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             tasksGoogle = taskRepo.googleMode
             message = r.fold(
                 { n -> if (n > 0) "Google ToDo リストと同期しました（端末のタスク${n}件を移動）" else "Google ToDo リストと同期しました" },
-                { "Google ToDo リストに接続できませんでした：${it.message}" },
+                { "Google ToDo リストに接続できませんでした：${it.message ?: it.javaClass.simpleName}" },
             )
             reload()
         }

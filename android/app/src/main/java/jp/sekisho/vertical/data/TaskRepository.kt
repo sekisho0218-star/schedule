@@ -3,7 +3,9 @@ package jp.sekisho.vertical.data
 import android.content.Context
 import android.content.SharedPreferences
 import jp.sekisho.vertical.widget.WidgetUpdater
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -65,7 +67,9 @@ class TaskRepository(context: Context) {
         write(store, date, tasks(date).filterNot { it.id == id })
         if (googleMode && !id.startsWith(TEMP)) {
             val token = GoogleAuth.silentToken(appContext) ?: return DataSignals.error(NEED_LOGIN)
-            runCatching { GoogleTasksApi(token).complete(id) }.onFailure { DataSignals.error("タスクを完了にできませんでした") }
+            withContext(Dispatchers.IO) {
+                runCatching { GoogleTasksApi(token).complete(id) }.onFailure { DataSignals.error("タスクを完了にできませんでした") }
+            }
         }
     }
 
@@ -73,7 +77,10 @@ class TaskRepository(context: Context) {
     suspend fun refresh(from: LocalDate, toExclusive: LocalDate): Boolean {
         if (!googleMode) return false
         val token = GoogleAuth.silentToken(appContext) ?: return false
-        val remote = runCatching { GoogleTasksApi(token).list(from, toExclusive) }.getOrElse { return false }
+        // 通信は必ずメインスレッド以外で行う（Android ではメインスレッドでの通信は禁止）
+        val remote = withContext(Dispatchers.IO) {
+            runCatching { GoogleTasksApi(token).list(from, toExclusive) }
+        }.getOrElse { return false }
         val byDate = remote.groupBy { it.due }
         val editor = cache.edit()
         var d = from
@@ -91,7 +98,8 @@ class TaskRepository(context: Context) {
     }
 
     /** Google 同期を始める：端末内のタスクを Google に移してから切り替える */
-    suspend fun enableGoogle(token: String): Result<Int> = runCatching {
+    suspend fun enableGoogle(token: String): Result<Int> = withContext(Dispatchers.IO) {
+      runCatching {
         val api = GoogleTasksApi(token)
         var moved = 0
         local.all.keys.toList().sorted().forEach { key ->
@@ -102,6 +110,7 @@ class TaskRepository(context: Context) {
         cache.edit().clear().commit()
         prefs.tasksGoogle = true
         moved
+      }
     }
 
     fun disableGoogle() {

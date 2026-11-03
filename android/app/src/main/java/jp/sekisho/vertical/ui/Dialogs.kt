@@ -298,6 +298,14 @@ fun SettingsDialog(
                         OutlinedButton(onClick = onConnectTasks) { Text("Google ToDo リストと同期") }
                     }
                 }
+
+                val context = LocalContext.current
+                val version = remember {
+                    runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
+                }
+                if (version != null) {
+                    Text("バージョン $version", fontSize = 11.sp, color = c(Palette.SUB), modifier = Modifier.padding(top = 14.dp))
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },

@@ -79,7 +79,10 @@ class GoogleTasksApi(private val token: String) {
             val code = conn.responseCode
             val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
                 ?.bufferedReader()?.use { it.readText() } ?: ""
-            if (code !in 200..299) throw IOException("Google Tasks API エラー ($code)")
+            if (code !in 200..299) {
+                val reason = runCatching { JSONObject(text).getJSONObject("error").optString("message") }.getOrNull()
+                throw IOException("Google Tasks API エラー ($code)" + (reason?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: ""))
+            }
             return if (text.isBlank()) JSONObject() else JSONObject(text)
         } finally {
             conn.disconnect()

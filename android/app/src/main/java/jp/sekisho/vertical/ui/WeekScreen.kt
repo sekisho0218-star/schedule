@@ -48,6 +48,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -257,6 +258,9 @@ private fun DayTimeline(
             val bottom = (s.endMin - Dates.START_MIN).coerceAtMost(Dates.RANGE_MIN)
             if (bottom <= 0 || top >= Dates.RANGE_MIN) return@forEach
             val h = (hourH * (bottom - top) / 60).coerceAtLeast(sdp(16f))
+            // 枠に入る行数（上下の余白を除いた高さ ÷ 1行の高さ）。入りきらない分は「…」
+            val lineDp = 13f * LocalTextScale.current * LocalDensity.current.fontScale
+            val maxLines = (((h - 6.dp).value) / lineDp).toInt().coerceAtLeast(1)
             Box(
                 Modifier
                     .offset(x = colW * s.col / s.ncols, y = hourH * top / 60)
@@ -273,7 +277,8 @@ private fun DayTimeline(
                     lineHeight = ssp(13f),
                     color = c(Palette.EVENT_TEXT),
                     fontWeight = FontWeight.Medium,
-                    overflow = TextOverflow.Clip,
+                    maxLines = maxLines,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
