@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -216,9 +217,10 @@ private fun TopBar(
     onSync: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().background(c(Palette.BAR)).statusBarsPadding()) {
+    val ink = c(Palette.INK)
+    Column(Modifier.fillMaxWidth().background(c(Palette.BG)).statusBarsPadding()) {
         Row(
-            Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 6.dp),
+            Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BarButton("‹", onPrev)
@@ -226,30 +228,34 @@ private fun TopBar(
             BarButton("›", onNext)
             Text(
                 title,
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                color = ink,
+                fontSize = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(start = 6.dp),
+                modifier = Modifier.weight(1f).padding(start = 8.dp),
             )
-            Row(Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Color(0x59FFFFFF), RoundedCornerShape(6.dp))) {
+            // 週間／月間の切り替え（グレーの台の上に白い選択中ボタン）
+            Row(Modifier.clip(RoundedCornerShape(9.dp)).background(Color(0xFFE2DED4)).padding(2.dp)) {
                 ViewMode.entries.forEach { m ->
                     val active = m == mode
                     Box(
-                        Modifier.background(if (active) Color.White else Color.Transparent)
-                            .clickable { onMode(m) }.padding(horizontal = 9.dp, vertical = 6.dp),
+                        Modifier
+                            .let { if (active) it.shadow(1.dp, RoundedCornerShape(7.dp)) else it }
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (active) Color.White else Color.Transparent)
+                            .clickable { onMode(m) }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
                     ) {
                         Text(
                             if (m == ViewMode.WEEK) "週間" else "月間",
                             fontSize = 13.sp,
-                            color = if (active) c(Palette.BAR) else Color.White,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                            color = if (active) ink else Color(0xFF555555),
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     }
                 }
             }
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(6.dp))
             BarButton("⟳", onSync)
             BarButton("⚙", onSettings)
         }
@@ -259,11 +265,10 @@ private fun TopBar(
 @Composable
 private fun BarButton(label: String, onClick: () -> Unit, wide: Boolean = false) {
     Box(
-        Modifier.height(36.dp).let { if (wide) it.padding(horizontal = 2.dp) else it.size(34.dp) }
-            .clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(horizontal = if (wide) 6.dp else 0.dp),
+        Modifier.height(38.dp).let { if (wide) it.padding(horizontal = 2.dp) else it.size(38.dp) }
+            .clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = if (wide) 8.dp else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = if (wide) 13.sp else 20.sp)
+        Text(label, color = c(Palette.INK), fontSize = if (wide) 15.sp else 22.sp)
     }
 }
-

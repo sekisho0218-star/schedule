@@ -22,7 +22,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Palette.BAR))
+        // 明るい上部バーに合わせて、ステータスバーのアイコンを濃い色にする
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Palette.BG, Palette.BG))
 
         val ids = AppWidgetManager.getInstance(this)
             .getAppWidgetIds(ComponentName(this, WeekWidgetReceiver::class.java))

@@ -7,7 +7,9 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -42,7 +44,14 @@ fun Modifier.bottomLine(color: Color, width: Float = 2f) = drawBehind {
     drawLine(color, Offset(0f, size.height - w / 2), Offset(size.width, size.height - w / 2), w)
 }
 
-/** 予定の見た目：薄い背景＋左端に予定の色の帯 */
-fun Modifier.eventStyle(color: Int) = background(Color(Palette.eventBg(color))).drawBehind {
-    drawRect(Color(color), size = androidx.compose.ui.geometry.Size(2.5.dp.toPx(), size.height))
+/** 予定の見た目：角丸・薄い影・予定の色を薄くした背景 */
+fun Modifier.eventStyle(color: Int) = this
+    .shadow(1.dp, androidx.compose.foundation.shape.RoundedCornerShape(6.dp), clip = false)
+    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+    .background(Color(Palette.eventBg(color)))
+
+/** 列の左側の破線 */
+fun Modifier.leftDashed(color: Color = c(Palette.LINE)) = drawBehind {
+    drawLine(color, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx(),
+        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())))
 }

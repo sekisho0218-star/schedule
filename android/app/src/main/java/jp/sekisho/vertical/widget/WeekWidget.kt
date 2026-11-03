@@ -65,6 +65,9 @@ class WeekWidget : GlanceAppWidget() {
 
 private fun cp(argb: Int) = ColorProvider(Color(argb))
 
+/** タスク欄の罫線（薄く目立たない色） */
+private const val TASK_RULE = 0xFFEBE6DB.toInt()
+
 @Composable
 private fun WidgetContent(version: Long) {
     val context = LocalContext.current
@@ -88,7 +91,7 @@ private fun WidgetContent(version: Long) {
     val titleH = (28f * ts.coerceAtMost(1.3f)).dp
     val rowH = (19f * ts).dp
     val axisW = WeekBitmapRenderer.axisDp(size.width.value).dp
-    val tasksH = rowH * TaskRepository.PER_DAY + 4.dp
+    val tasksH = rowH * TaskRepository.PER_DAY + (TaskRepository.PER_DAY - 1).dp
     val imageH = (size.height - titleH - tasksH).coerceAtLeast(60.dp)
     // 画面の解像度どおりに描いて文字のぼやけを防ぐ（RGB_565 でメモリを節約）
     val scale = context.resources.displayMetrics.density.coerceAtMost(3.5f)
@@ -100,18 +103,18 @@ private fun WidgetContent(version: Long) {
     Column(GlanceModifier.fillMaxSize().cornerRadius(12.dp).background(cp(Palette.PAPER))) {
         // タイトル行
         Row(
-            GlanceModifier.fillMaxWidth().height(titleH).background(cp(Palette.BAR)).padding(horizontal = 8.dp),
+            GlanceModifier.fillMaxWidth().height(titleH).background(cp(Palette.BG)).padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 Dates.weekTitle(weekStart),
-                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = (13f * ts.coerceAtMost(1.3f)).sp, fontWeight = FontWeight.Bold),
+                style = TextStyle(color = cp(Palette.INK), fontSize = (13f * ts.coerceAtMost(1.3f)).sp, fontWeight = FontWeight.Medium),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight().clickable(openApp),
             )
             Text(
                 "⟳",
-                style = TextStyle(color = cp(0xFFFFFFFF.toInt()), fontSize = (16f * ts.coerceAtMost(1.3f)).sp),
+                style = TextStyle(color = cp(Palette.INK), fontSize = (16f * ts.coerceAtMost(1.3f)).sp),
                 modifier = GlanceModifier.padding(horizontal = 6.dp).clickable(actionRunCallback<RefreshAction>()),
             )
         }
@@ -132,13 +135,17 @@ private fun WidgetContent(version: Long) {
             modifier = GlanceModifier.fillMaxWidth().defaultWeight().clickable(openApp),
         )
 
-        // タスク（各日5件・チェックで削除）
+        // タスク（各日5件・チェックで削除）。行と日の間に目立たない罫線を引く
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(cp(Palette.LINE))) {}
-        Row(GlanceModifier.fillMaxWidth().height(tasksH).padding(vertical = 2.dp)) {
+        Row(GlanceModifier.fillMaxWidth().height(tasksH)) {
             Box(GlanceModifier.width(axisW).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("✓", style = TextStyle(color = cp(Palette.SUB), fontSize = (9f * ts).sp))
+                Text("TASK", style = TextStyle(color = cp(Palette.SUB), fontSize = (8f * ts).sp))
             }
             days.forEach { d ->
+              // Glance の Row は子要素10個までなので、罫線と1日分の列をまとめる
+              Row(GlanceModifier.defaultWeight().fillMaxHeight()) {
+                // 日の区切り（縦の罫線）
+                Box(GlanceModifier.width(1.dp).fillMaxHeight().background(cp(TASK_RULE))) {}
                 Column(GlanceModifier.defaultWeight().fillMaxHeight()) {
                     val list = tasks[d].orEmpty()
                     for (i in 0 until TaskRepository.PER_DAY) {
@@ -172,8 +179,13 @@ private fun WidgetContent(version: Long) {
                                 Spacer(GlanceModifier.fillMaxWidth().fillMaxHeight().clickable(openApp))
                             }
                         }
+                        // 行の区切り（横の罫線）
+                        if (i < TaskRepository.PER_DAY - 1) {
+                            Box(GlanceModifier.fillMaxWidth().height(1.dp).background(cp(TASK_RULE))) {}
+                        }
                     }
                 }
+              }
             }
         }
     }

@@ -1,6 +1,6 @@
 # 週間バーチカル手帳
 
-> **Android アプリ版**は [`android/`](android/README.md) にあります（ホーム画面ウィジェット対応）。以下は PC・スマホのブラウザで使える Web アプリ（PWA）版の説明です。
+> **Android アプリ版**は [`android/`](android/README.md)（ホーム画面ウィジェット対応）、**Windows デスクトップ版**は [`desktop/`](desktop/README.md) にあります。以下は PC・スマホのブラウザで使える Web アプリ（PWA）版の説明です。
 
 PC とスマホの両方で使えるスケジュール管理アプリ（PWA）です。ジブン手帳の週間バーチカルを参考にしたレイアウトで、Googleカレンダーと同期できます。
 

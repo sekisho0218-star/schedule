@@ -2,6 +2,7 @@ package jp.sekisho.vertical.widget
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -52,7 +53,7 @@ object WeekBitmapRenderer {
         val headerH = sz(30f)
         val eventText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.DEFAULT_BOLD
-            textSize = sz(9f)
+            textSize = sz(9.5f)
             color = Palette.EVENT_TEXT
         }
         val maxAllDay = days.maxOf { dayEvents[it]?.allDay?.size ?: 0 }.coerceAtMost(2)
@@ -92,23 +93,29 @@ object WeekBitmapRenderer {
             fill.color = Palette.tint(Dates.kind(d))
             cv.drawRect(x, top, x + colW, h.toFloat(), fill)
         }
-        line.color = Palette.LINE_SOFT
-        for (i in 1 until hours) {
+        val dash = DashPathEffect(floatArrayOf(dp(4f), dp(3f)), 0f)
+        line.pathEffect = dash
+        for (i in 0 until hours) {
+            val half = top + hourH * i + hourH / 2
+            line.color = 0xFFEBE6DB.toInt()
+            cv.drawLine(axisW, half, w.toFloat(), half, line)
+            if (i == 0) continue
             val y = top + hourH * i
+            line.color = 0xFFD8D2C4.toInt()
             cv.drawLine(axisW, y, w.toFloat(), y, line)
         }
-        line.color = Palette.LINE
+        line.pathEffect = null
+        line.color = Palette.LINE_SOFT
         cv.drawLine(0f, top, w.toFloat(), top, line)
-        cv.drawLine(0f, headerH, w.toFloat(), headerH, line)
 
         // ---- 時刻ラベル ----
-        text.textAlign = Paint.Align.RIGHT
+        text.textAlign = Paint.Align.CENTER
         text.typeface = Typeface.DEFAULT
-        text.textSize = sz(9f)
-        text.color = Palette.INK
+        text.textSize = sz(10f)
+        text.color = 0xFF555555.toInt()
         val step = if (hourH < sz(11f)) 2 else 1
         for (i in 0 until hours step step) {
-            cv.drawText("${Dates.START_HOUR + i}", axisW - dp(2f), top + hourH * i + sz(9f), text)
+            cv.drawText("${Dates.START_HOUR + i}", axisW / 2, top + hourH * i + sz(10f), text)
         }
 
         // ---- 終日予定 ----
@@ -118,7 +125,7 @@ object WeekBitmapRenderer {
                 val y = headerH + dp(1.5f) + allDayRowH * j
                 val r = RectF(x + dp(1f), y, x + colW - dp(1f), y + allDayRowH - dp(1f))
                 drawEventBox(cv, r, ev.color, fill, ::dp)
-                drawClipped(cv, ev.title, r, dp(1.5f), dp(4f), eventText, singleLine = true)
+                drawClipped(cv, ev.title, r, dp(1.5f), dp(3f), eventText, singleLine = true)
             }
         }
 
@@ -132,18 +139,20 @@ object WeekBitmapRenderer {
                 val cw = colW / s.ncols
                 val y1 = top + hourH * t / 60f
                 val y2 = maxOf(top + hourH * b / 60f, y1 + sz(12f))
-                val r = RectF(x + cw * s.col + dp(1f), y1 + dp(0.5f), x + cw * (s.col + 1) - dp(1f), y2 - dp(0.5f))
+                val r = RectF(x + cw * s.col + dp(1.5f), y1 + dp(1f), x + cw * (s.col + 1) - dp(1.5f), y2 - dp(1f))
                 drawEventBox(cv, r, s.event.color, fill, ::dp)
-                drawClipped(cv, s.event.title, r, dp(1.5f), dp(4f), eventText, singleLine = false)
+                drawClipped(cv, s.event.title, r, dp(2f), dp(3f), eventText, singleLine = false)
             }
         }
 
-        // ---- 縦の区切り線 ----
+        // ---- 縦の区切り線（破線） ----
         line.color = Palette.LINE
+        line.pathEffect = dash
         for (i in 0..6) {
             val x = axisW + colW * i
             cv.drawLine(x, 0f, x, h.toFloat(), line)
         }
+        line.pathEffect = null
 
         // ---- 現在時刻 ----
         val ti = days.indexOf(today)
@@ -159,15 +168,12 @@ object WeekBitmapRenderer {
         return bmp
     }
 
-    /** 予定の箱：薄い背景＋左端に予定の色の帯 */
+    /** 予定の箱：角丸・予定の色を薄くした背景・下側にうっすら影 */
     private fun drawEventBox(cv: Canvas, r: RectF, color: Int, fill: Paint, dp: (Float) -> Float) {
+        fill.color = 0x22000000
+        cv.drawRoundRect(RectF(r.left, r.top + dp(0.8f), r.right, r.bottom + dp(0.8f)), dp(4f), dp(4f), fill)
         fill.color = Palette.eventBg(color)
-        cv.drawRoundRect(r, dp(2f), dp(2f), fill)
-        fill.color = color
-        cv.save()
-        cv.clipRect(r.left, r.top, r.left + dp(2.5f), r.bottom)
-        cv.drawRoundRect(r, dp(2f), dp(2f), fill)
-        cv.restore()
+        cv.drawRoundRect(r, dp(4f), dp(4f), fill)
     }
 
     /** 矩形内に文字を折り返して描画（はみ出す分は切り捨て） */

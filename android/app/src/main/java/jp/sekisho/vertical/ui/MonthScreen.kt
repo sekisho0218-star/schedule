@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,9 +65,9 @@ fun MonthScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(6.dp))
-            .background(c(Palette.PAPER))
-            .border(1.dp, c(Palette.LINE), RoundedCornerShape(6.dp)),
+            .shadow(3.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(c(Palette.PAPER)),
     ) {
         Row(Modifier.fillMaxWidth()) {
             for (i in 0L until 7L) {
@@ -115,17 +116,16 @@ fun MonthScreen(
                         items.take(maxItems).forEach { (ev, allDay) ->
                             if (allDay) {
                                 Text(
-                                    ev.title, fontSize = ssp(10f), fontWeight = FontWeight.SemiBold, color = c(Palette.EVENT_TEXT),
+                                    ev.title, fontSize = ssp(10.5f), fontWeight = FontWeight.Medium, color = c(Palette.EVENT_TEXT),
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).eventStyle(ev.color)
-                                        .padding(start = 4.dp, end = 2.dp),
+                                    modifier = Modifier.fillMaxWidth().eventStyle(ev.color).padding(horizontal = 4.dp),
                                 )
                             } else {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.size(sdp(3f), sdp(12f)).background(Color(ev.color)))
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(ev.title, fontSize = ssp(10f), color = c(Palette.EVENT_TEXT), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
+                                Text(
+                                    ev.title, fontSize = ssp(10.5f), color = c(Palette.EVENT_TEXT), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(5.dp))
+                                        .background(Color(Palette.eventBg(ev.color, 0.7f))).padding(horizontal = 4.dp),
+                                )
                             }
                         }
                         if (items.size > maxItems) Text("他${items.size - maxItems}件", fontSize = ssp(9f), color = c(Palette.SUB))
