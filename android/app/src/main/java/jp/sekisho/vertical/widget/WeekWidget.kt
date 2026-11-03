@@ -14,6 +14,10 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.currentState
+import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -55,13 +59,18 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 
+/** ウィジェットごとの設定：true なら今日を一番左に（false は月曜始まり） */
+val StartTodayKey = booleanPreferencesKey("startToday")
+
 class WeekWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
+    override val stateDefinition = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val version by DataSignals.version.collectAsState()
-            WidgetContent(version)
+            val startToday = currentState<Preferences>()[StartTodayKey] ?: false
+            WidgetContent(version, startToday)
         }
     }
 }
@@ -72,12 +81,13 @@ private fun cp(argb: Int) = ColorProvider(Color(argb))
 private const val TASK_RULE = 0xFFEBE6DB.toInt()
 
 @Composable
-private fun WidgetContent(version: Long) {
+private fun WidgetContent(version: Long, startToday: Boolean) {
     val context = LocalContext.current
     val size = LocalSize.current
     val today = LocalDate.now()
     val now = LocalTime.now()
-    val weekStart = Dates.weekStart(today)
+    // 表示する7日間の初日：今日始まり、または今週の月曜
+    val weekStart = if (startToday) today else Dates.weekStart(today)
     val days = (0L..6L).map { weekStart.plusDays(it) }
 
     val calendarRepo = remember { CalendarRepository(context) }
@@ -103,7 +113,7 @@ private fun WidgetContent(version: Long) {
     val imageH = (size.height - titleH - tasksH).coerceAtLeast(60.dp)
     // 画面の解像度どおりに描いて文字のぼやけを防ぐ（RGB_565 でメモリを節約）
     val scale = context.resources.displayMetrics.density.coerceAtMost(3.5f)
-    val bitmap = remember(version, size, today, now.hour, now.minute / 15) {
+    val bitmap = remember(version, size, weekStart, today, now.hour, now.minute / 15) {
         WeekBitmapRenderer.render(size.width.value, imageH.value, scale, days, dayEvents, today, now)
     }
     val openApp = actionStartActivity<MainActivity>()
@@ -119,6 +129,13 @@ private fun WidgetContent(version: Long) {
                 style = TextStyle(color = cp(Palette.INK), fontSize = (13f * ts.coerceAtMost(1.3f)).sp, fontWeight = FontWeight.Medium),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight().clickable(openApp),
+            )
+            // 今日始まり ⇄ 月曜始まり の切り替え（押すと切り替わる方を表示）
+            Text(
+                if (startToday) "⇄ 月曜から" else "⇄ 今日から",
+                style = TextStyle(color = cp(Palette.INK), fontSize = (11f * ts.coerceAtMost(1.3f)).sp),
+                modifier = GlanceModifier.padding(horizontal = 8.dp, vertical = 2.dp).cornerRadius(10.dp)
+                    .background(cp(0xFFE2DED4.toInt())).clickable(actionRunCallback<ToggleStartAction>()),
             )
             Text(
                 "⟳",

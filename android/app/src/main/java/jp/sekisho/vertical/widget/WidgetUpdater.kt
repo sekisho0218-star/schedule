@@ -67,8 +67,8 @@ object WidgetUpdater {
 class WidgetRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         // Google ToDo リストで他の端末（PCなど）から変更されたタスクを取り込む
-        val week = Dates.weekStart(LocalDate.now())
-        TaskRepository(applicationContext).refresh(week, week.plusDays(7))
+        val today = LocalDate.now()
+        TaskRepository(applicationContext).refresh(Dates.weekStart(today), today.plusDays(8))
         DataSignals.bump()
         WeekWidget().updateAll(applicationContext)
         return Result.success()

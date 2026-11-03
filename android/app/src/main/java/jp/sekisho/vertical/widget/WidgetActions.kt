@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.state.updateAppWidgetState
 import jp.sekisho.vertical.data.CalendarRepository
 import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
@@ -27,9 +28,18 @@ class CompleteTaskAction : ActionCallback {
 class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         CalendarRepository(context).requestSync()
-        val week = Dates.weekStart(LocalDate.now())
-        TaskRepository(context).refresh(week, week.plusDays(7))
+        // 月曜始まり・今日始まりのどちらでも表示する日を含むように取得
+        val today = LocalDate.now()
+        TaskRepository(context).refresh(Dates.weekStart(today), today.plusDays(8))
         DataSignals.bump()
+        WeekWidget().update(context, glanceId)
+    }
+}
+
+/** 今日始まり ⇄ 月曜始まり の切り替え（ウィジェットごと） */
+class ToggleStartAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        updateAppWidgetState(context, glanceId) { prefs -> prefs[StartTodayKey] = !(prefs[StartTodayKey] ?: false) }
         WeekWidget().update(context, glanceId)
     }
 }
