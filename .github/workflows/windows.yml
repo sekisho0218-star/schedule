@@ -1,0 +1,53 @@
+name: Windows App
+
+on:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build installer
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vertical-techo-windows
+          path: desktop/dist/VerticalTecho-Setup.exe
+          if-no-files-found: error
+
+      # ブラウザから直接ダウンロードできるよう Releases に最新版を置く
+      - name: Publish to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-windows
+          name: 最新版 Windows アプリ（バーチカル手帳）
+          body: |
+            下の Assets にある `VerticalTecho-Setup.exe` をダウンロードして実行するとインストールされます。
+            「Windows によって PC が保護されました」と表示された場合は「詳細情報」→「実行」を押してください。
+            ビルド元コミット: ${{ github.sha }}
+          prerelease: true
+          files: desktop/dist/VerticalTecho-Setup.exe

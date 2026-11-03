@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>バーチカル手帳</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="toolbar" id="toolbar">
+    <div class="nav">
+      <button id="btn-prev" class="icon-btn" title="前へ">‹</button>
+      <button id="btn-today" class="text-btn">今日</button>
+      <button id="btn-next" class="icon-btn" title="次へ">›</button>
+      <h1 id="title" class="title"></h1>
+    </div>
+    <div class="actions">
+      <div class="seg">
+        <button id="tab-week" class="seg-btn active">週間</button>
+        <button id="tab-month" class="seg-btn">月間</button>
+      </div>
+      <button id="btn-sync" class="icon-btn" title="Googleと同期">⟳</button>
+      <button id="btn-mode" class="icon-btn" title="表示モードの切り替え"></button>
+      <button id="btn-lock" class="icon-btn" title="位置とサイズの固定"></button>
+      <button id="btn-settings" class="icon-btn" title="設定">⚙</button>
+      <button id="btn-hide" class="icon-btn" title="隠す（タスクトレイから再表示）">－</button>
+    </div>
+  </header>
+
+  <main id="view"></main>
+  <div id="status" class="status" hidden></div>
+
+  <!-- 予定 -->
+  <dialog id="event-dialog">
+    <form id="event-form" method="dialog">
+      <h2 id="event-dialog-title">予定</h2>
+      <label>タイトル<input name="title" required autocomplete="off"></label>
+      <label class="row"><input type="checkbox" name="allDay"> 終日</label>
+      <div class="row2">
+        <label>開始日<input type="date" name="date" required></label>
+        <label>終了日<input type="date" name="endDate" required></label>
+      </div>
+      <div class="row2 times">
+        <label>開始<input type="time" name="start" step="300"></label>
+        <label>終了<input type="time" name="end" step="300"></label>
+      </div>
+      <label>メモ<textarea name="description" rows="3"></textarea></label>
+      <p class="hint" id="event-source"></p>
+      <div class="dialog-actions">
+        <button type="button" id="btn-event-delete" class="danger">削除</button>
+        <span class="spacer"></span>
+        <button type="button" id="btn-event-cancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- タスク編集 -->
+  <dialog id="task-dialog">
+    <form id="task-form" method="dialog">
+      <h2>タスク</h2>
+      <label>内容<input name="text" autocomplete="off"></label>
+      <div class="dialog-actions">
+        <button type="button" id="btn-task-done" class="danger">完了（消す）</button>
+        <span class="spacer"></span>
+        <button type="button" id="btn-task-cancel">キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 設定 -->
+  <dialog id="settings-dialog">
+    <form id="settings-form" method="dialog">
+      <h2>設定</h2>
+
+      <h3>Google アカウント</h3>
+      <p class="hint" id="google-state"></p>
+      <label>クライアントID<input name="clientId" placeholder="xxxxx.apps.googleusercontent.com" autocomplete="off"></label>
+      <label>クライアントシークレット<input name="clientSecret" type="password" placeholder="（保存済みの場合は空欄のままでOK）" autocomplete="off"></label>
+      <p class="hint">Google Cloud で作成した「デスクトップ アプリ」の OAuth クライアントを入力します。手順は <a href="#" id="link-readme">README</a> を参照してください。</p>
+      <div class="dialog-actions left">
+        <button type="button" id="btn-signin" class="primary">保存してGoogleにログイン</button>
+        <button type="button" id="btn-signout" class="danger">ログアウト</button>
+      </div>
+
+      <h3>表示</h3>
+      <label class="row"><input type="radio" name="mode" value="desktop"> デスクトップに貼り付け（他のウィンドウの後ろ）</label>
+      <label class="row"><input type="radio" name="mode" value="top"> 常に手前に表示</label>
+      <label class="row"><input type="checkbox" name="locked"> 位置とサイズを固定</label>
+      <label>透明度 <span id="opacity-value"></span><input type="range" name="opacity" min="0.4" max="1" step="0.05"></label>
+      <label class="row"><input type="checkbox" name="autostart"> Windows の起動時に自動で開く</label>
+
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="submit" class="primary">閉じる</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
