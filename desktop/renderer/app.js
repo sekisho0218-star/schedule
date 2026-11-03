@@ -192,18 +192,27 @@ function renderWeek(root) {
   }
   root.append(grid);
 
-  // 1時間の高さ：スクロールせずに 8〜24時が収まるように
-  requestAnimationFrame(() => {
-    const h = scroll.clientHeight;
-    const hourH = Math.max(18, h / 16);
-    if (h > 0) document.documentElement.style.setProperty('--hour-h', `${hourH}px`);
-    // 予定ブロックの高さに入る行数だけ予定名を表示（入りきらない分は「…」）
-    scroll.querySelectorAll('.event').forEach((ev) => {
-      const name = ev.firstChild;
-      const lineH = parseFloat(getComputedStyle(name).lineHeight) || 14;
-      const boxH = Math.max(ev.clientHeight, (Number(ev.dataset.mins) / 60) * hourH) - 1;
-      name.style.webkitLineClamp = String(Math.max(1, Math.floor(boxH / lineH)));
-    });
+  // 1時間の高さと予定名の行数を合わせる（表示直後と、ウィンドウの大きさが変わるたびに）
+  fitTimeline(scroll);
+  if (fitObserver) fitObserver.disconnect();
+  fitObserver = new ResizeObserver(() => fitTimeline(scroll));
+  fitObserver.observe(scroll);
+}
+
+let fitObserver = null;
+
+/** 8〜24時がスクロールせずに収まる1時間の高さにし、予定名は枠に入る行数だけ表示（入りきらない分は「…」） */
+function fitTimeline(scroll) {
+  const h = scroll.clientHeight;
+  if (h <= 0) return;
+  const hourH = Math.max(18, h / 16);
+  document.documentElement.style.setProperty('--hour-h', `${hourH}px`);
+  scroll.querySelectorAll('.event').forEach((ev) => {
+    const name = ev.firstChild;
+    const lineH = parseFloat(getComputedStyle(name).lineHeight) || 13;
+    const lines = Math.max(1, Math.floor((ev.clientHeight - 1) / lineH));
+    name.style.webkitLineClamp = String(lines);
+    name.style.maxHeight = `${lines * lineH}px`; // 行数指定が効かない場合も行の途中で切れないように
   });
 }
 
@@ -476,6 +485,7 @@ function openSettings() {
   f.opacity.value = s.opacity || 1; $('#opacity-value').textContent = `${Math.round((s.opacity || 1) * 100)}%`;
   $('#google-state').textContent = s.signedIn ? '状態：ログイン済み（予定・タスクを同期中）' : '状態：未ログイン';
   $('#btn-signout').hidden = !s.signedIn;
+  $('#app-version').textContent = s.version ? `バージョン ${s.version}` : '';
   $('#settings-dialog').showModal();
 }
 

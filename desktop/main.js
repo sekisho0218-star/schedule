@@ -55,6 +55,8 @@ function start() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // 他のウィンドウの後ろにあっても画面の更新（予定名の行数調整など）を止めない
+      backgroundThrottling: false,
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -124,6 +126,7 @@ function publicState() {
     opacity: cfg.opacity,
     autostart: cfg.autostart,
     view: cfg.view,
+    version: app.getVersion(),
   };
 }
 

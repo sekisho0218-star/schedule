@@ -87,7 +87,7 @@ main { flex: 1; min-height: 0; padding: 0 5px 5px; display: flex; flex-direction
 }
 .ev-style { background: var(--ev-bg); color: var(--event-ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
 .allday-item {
-  font-size: calc(11px * var(--ts)); font-weight: 500; border-radius: 5px; padding: 0 4px; line-height: 1.4;
+  font-size: calc(11px * var(--ts)); font-weight: 400; border-radius: 5px; padding: 0 4px; line-height: 1.4;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
 }
 
@@ -109,7 +109,7 @@ main { flex: 1; min-height: 0; padding: 0 5px 5px; display: flex; flex-direction
 .now-line::before { content: ""; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--today); }
 .event {
   position: absolute; border-radius: 5px; padding: 0 3px; overflow: hidden; cursor: pointer; z-index: 2;
-  font-size: calc(11px * var(--ts)); line-height: 1.15; font-weight: 500; word-break: break-all;
+  font-size: calc(11px * var(--ts)); line-height: 1.15; font-weight: 400; word-break: break-all;
 }
 /* 予定名は枠に入る行数だけ表示し、入りきらない分は「…」（行の途中で切れないように） */
 .event .name { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
@@ -130,7 +130,7 @@ main { flex: 1; min-height: 0; padding: 0 5px 5px; display: flex; flex-direction
 .task input[type=checkbox] { margin: 0; width: calc(12px * var(--ts)); height: calc(12px * var(--ts)); flex: none; accent-color: #444; cursor: pointer; }
 .task .task-text {
   flex: 1; min-width: 0; border: 0; background: transparent; outline: none; padding: 0;
-  font: inherit; font-size: calc(11px * var(--ts)); font-weight: 500; color: var(--ink);
+  font: inherit; font-size: calc(11px * var(--ts)); font-weight: 400; color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; user-select: text;
 }
 .task .task-text::placeholder { color: #a8a192; font-size: 1.1em; }
