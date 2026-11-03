@@ -206,9 +206,13 @@ fun MainScreen(vm: MainViewModel) {
                 },
                 onRunNow = { showSettings = false; vm.runShiftNow() },
                 onResetDismissed = vm::resetShiftDismissed,
+                onOpenBulkDelete = { showSettings = false; vm.openSyncedList() },
             ),
             onDismiss = { showSettings = false },
         )
+    }
+    vm.syncedList?.let { list ->
+        BulkDeleteDialog(items = list, onDelete = vm::deleteSynced, onDismiss = vm::closeSyncedList)
     }
     vm.shiftDialog?.let { p ->
         ShiftDialog(

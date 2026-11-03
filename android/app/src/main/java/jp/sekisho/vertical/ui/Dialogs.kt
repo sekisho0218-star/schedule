@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -335,6 +336,7 @@ data class ShiftSettingsUi(
     val onChange: (enabled: Boolean?, url: String?, teacher: String?, calendarId: Long?) -> Unit,
     val onRunNow: () -> Unit,
     val onResetDismissed: () -> Unit,
+    val onOpenBulkDelete: () -> Unit,
 )
 
 @Composable
@@ -386,6 +388,85 @@ private fun ShiftSettingsSection(st: ShiftSettingsUi, writable: List<CalendarInf
         }) { Text(if (st.running) "照合中…" else "今すぐ照合") }
         TextButton(onClick = st.onResetDismissed) { Text("「反映しない」をリセット", fontSize = 12.sp) }
     }
+    TextButton(onClick = st.onOpenBulkDelete) {
+        Text("シフト表から追加した予定を一括削除", fontSize = 13.sp, color = c(Palette.SUN))
+    }
+}
+
+/** シフト表から追加した予定の一括削除（二重になったときなど） */
+@Composable
+fun BulkDeleteDialog(
+    items: List<ShiftSync.Synced>,
+    onDelete: (List<CalEvent>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // 初期状態：重複があれば重複だけ、なければすべてを選ぶ
+    val anyDup = items.any { it.duplicate }
+    val selected = remember(items) {
+        mutableStateMapOf<Int, Boolean>().apply { items.forEachIndexed { i, it -> put(i, if (anyDup) it.duplicate else true) } }
+    }
+    var confirm by remember { mutableStateOf(false) }
+    val count = selected.count { it.value }
+
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("${count}件を削除しますか？") },
+            text = { Text("シフト表から追加した予定を Google カレンダーから削除します。元に戻せません。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    onDelete(items.filterIndexed { i, _ -> selected[i] == true }.map { it.ev })
+                }) { Text("削除する", color = c(Palette.SUN)) }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("キャンセル") } },
+        )
+        return
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("シフト表から追加した予定") },
+        text = {
+            Column {
+                Text(
+                    "「今すぐ照合」や自動の照合で追加した予定です（元からあった予定を書き換えたものは含みません）。" +
+                        "「重複」は、同じ時間に同じ授業の予定がほかにもあるものです。",
+                    fontSize = 12.sp, color = c(Palette.SUB),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { items.indices.forEach { selected[it] = true } }) { Text("すべて", fontSize = 12.sp) }
+                    if (anyDup) TextButton(onClick = { items.forEachIndexed { i, it -> selected[i] = it.duplicate } }) { Text("重複だけ", fontSize = 12.sp) }
+                    TextButton(onClick = { items.indices.forEach { selected[it] = false } }) { Text("解除", fontSize = 12.sp) }
+                }
+                Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                    items.forEachIndexed { i, it ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { selected[i] = !(selected[i] ?: false) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = selected[i] ?: false, onCheckedChange = { v -> selected[i] = v })
+                            Column(Modifier.weight(1f)) {
+                                Text(it.desc, fontSize = 12.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (it.duplicate) {
+                                        Text("重複", fontSize = 10.sp, color = Color(0xFFA1342B),
+                                            modifier = Modifier.padding(end = 4.dp).clip(RoundedCornerShape(4.dp))
+                                                .background(Color(0xFFFBE1DF)).padding(horizontal = 4.dp))
+                                    }
+                                    Text(it.calendarName, fontSize = 10.sp, color = c(Palette.SUB))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = count > 0, onClick = { confirm = true }) { Text("選んだ${count}件を削除", color = c(Palette.SUN)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
+    )
 }
 
 /** シフト表との違い（確認画面） */

@@ -24,6 +24,11 @@ import java.time.LocalTime
  * Windows 版（desktop/shiftsync.js）と同じルール。
  */
 class ShiftSync(context: Context) {
+    companion object {
+        /** シフト表から追加した予定のメモ（一括削除はこの印の付いた予定だけが対象） */
+        const val MARK_ADDED = "シフト表から自動登録（バーチカル手帳）"
+    }
+
     private val app = context.applicationContext
     private val prefs = Prefs(app)
     private val cal = CalendarRepository(app)
@@ -41,6 +46,8 @@ class ShiftSync(context: Context) {
         val eventId: Long = -1,
         val begin: Long = 0,
         val series: Boolean = false,
+        /** 変更するときに残す、元の予定のメモ */
+        val note: String = "",
     )
 
     data class Proposal(val key: String, val type: String, val desc: String, val checked: Boolean, val op: Op)
@@ -109,7 +116,8 @@ class ShiftSync(context: Context) {
     private fun apply(op: Op): Boolean {
         val draft = EventDraft(
             title = op.title,
-            description = "シフト表から自動登録（バーチカル手帳）",
+            // 追加した予定には印を付ける（一括削除の対象）。変更した予定は元のメモのまま
+            description = if (op.op == "add") MARK_ADDED else op.note,
             allDay = op.allDay,
             startDate = op.date,
             startTime = time(op.start),
@@ -214,7 +222,7 @@ class ShiftSync(context: Context) {
                 val title = mergeTitle(w.title, h.title)
                 if (title == h.title && minOfDay(h.begin) == w.start && minOfDay(h.end) == w.end) continue
                 ops += Op("update", "${dayLabel(date)} ${hm(minOfDay(h.begin))}–${hm(minOfDay(h.end))} ${h.title} → ${hm(w.start)}–${hm(w.end)} $title",
-                    calId, date, w.start, w.end, title, false, h.eventId, h.begin, h.series)
+                    calId, date, w.start, w.end, title, false, h.eventId, h.begin, h.series, h.description)
             }
             rest.forEachIndexed { wi, w ->
                 if (wi !in usedW) ops += Op("add", "${dayLabel(date)} ${hm(w.start)}–${hm(w.end)} ${w.title}", calId, date, w.start, w.end, w.title, false)
@@ -248,17 +256,50 @@ class ShiftSync(context: Context) {
         return Diff(ops, proposals, shift.notes)
     }
 
+    /* ---------------- シフト表から追加した予定の一括削除 ---------------- */
+
+    /** 一括削除の候補：シフト表から追加した予定（duplicate = 同じ時間に別の同じ授業がある） */
+    data class Synced(val ev: CalEvent, val calendarName: String, val duplicate: Boolean, val desc: String)
+
+    /** シフト表から追加した予定（30日前〜120日後）を一覧にする */
+    suspend fun listSynced(): List<Synced> = withContext(Dispatchers.IO) {
+        val today = LocalDate.now()
+        val calendars = cal.calendars().associateBy { it.id }
+        val events = cal.instances(today.minusDays(30), today.plusDays(120))
+        val mine = events.filter { it.description.contains(MARK_ADDED) && calendars[it.calendarId]?.writable == true }
+        mine.map { e ->
+            val date = localDate(e)
+            val dup = events.any { o ->
+                o !== e && !o.description.contains(MARK_ADDED) && localDate(o) == date &&
+                    o.begin < e.end && o.end > e.begin &&
+                    (sameLesson(o.title, e.title) || ShiftParser.noSpace(o.title) == ShiftParser.noSpace(e.title))
+            }
+            val whenText = if (e.allDay) "終日" else "${hm(minOfDay(e.begin))}–${hm(minOfDay(e.end))}"
+            Synced(e, calendars[e.calendarId]?.name ?: "", dup, "${dayLabel(date)} $whenText ${e.title}")
+        }.sortedBy { it.ev.begin }
+    }
+
+    /** 選んだ予定を削除。削除後は、次の照合で授業の変更をもう一度確認する */
+    suspend fun deleteSynced(list: List<CalEvent>): Int = withContext(Dispatchers.IO) {
+        val n = list.count { cal.deleteInstance(it) }
+        prefs.shiftConfirmedOnce = false
+        prefs.shiftPending = ""
+        DataSignals.bump()
+        WidgetUpdater.refresh(app)
+        n
+    }
+
     /* ---------------- 確認待ちの保存（JSON） ---------------- */
 
     private fun opJson(o: Op) = JSONObject()
         .put("op", o.op).put("desc", o.desc).put("cal", o.calendarId).put("date", o.date.toString())
         .put("start", o.start).put("end", o.end).put("title", o.title).put("allDay", o.allDay)
-        .put("eventId", o.eventId).put("begin", o.begin).put("series", o.series)
+        .put("eventId", o.eventId).put("begin", o.begin).put("series", o.series).put("note", o.note)
 
     private fun opOf(j: JSONObject) = Op(
         j.getString("op"), j.getString("desc"), j.getLong("cal"), LocalDate.parse(j.getString("date")),
         j.getInt("start"), j.getInt("end"), j.getString("title"), j.getBoolean("allDay"),
-        j.getLong("eventId"), j.getLong("begin"), j.getBoolean("series"),
+        j.getLong("eventId"), j.getLong("begin"), j.getBoolean("series"), j.optString("note", ""),
     )
 
     private fun toJson(p: Pending): String = JSONObject()

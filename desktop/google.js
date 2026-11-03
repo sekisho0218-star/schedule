@@ -201,17 +201,16 @@ function toGoogleEvent(ev) {
 const createEvent = (ev) => api('POST', `${CAL}/calendars/primary/events`, toGoogleEvent(ev));
 
 /** シフト表から登録する予定（あとで見分けられるよう印を付ける） */
+// 追加した予定のメモ（Android 版の一括削除はこの印の付いた予定だけが対象）
+const MARK_ADDED = 'シフト表から自動登録（バーチカル手帳）';
 function shiftBody(ev, kind) {
-  return {
-    ...toGoogleEvent(ev),
-    description: 'シフト表から自動登録（バーチカル手帳）',
-    extendedProperties: { private: { vtShift: kind } },
-  };
+  return { ...toGoogleEvent(ev), extendedProperties: { private: { vtShift: kind } } };
 }
 const createShiftEvent = (calendarId, ev, kind) =>
-  api('POST', `${CAL}/calendars/${encodeURIComponent(calendarId)}/events`, shiftBody(ev, kind));
-const updateShiftEvent = (calendarId, eventId, ev, kind) =>
-  api('PATCH', `${CAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, shiftBody(ev, kind));
+  api('POST', `${CAL}/calendars/${encodeURIComponent(calendarId)}/events`, { ...shiftBody(ev, kind), description: MARK_ADDED });
+/** 変更した予定は元のメモのまま（一括削除の対象にしない） */
+const updateShiftEvent = (calendarId, eventId, ev, kind, note = '') =>
+  api('PATCH', `${CAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { ...shiftBody(ev, kind), description: note });
 
 /** 書き込めるカレンダーの一覧（設定画面用） */
 async function writableCalendars() {

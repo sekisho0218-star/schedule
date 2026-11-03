@@ -98,7 +98,7 @@ async function compare(settings, today = new Date()) {
       const item = { ...w, title: mergeTitle(w.title, h.title) };
       const changed = item.title !== h.title || minOfDay(h.start) !== w.start || minOfDay(h.end) !== w.end;
       if (!changed) continue;
-      lessonOps.push({ op: 'update', calendarId: calId, eventId: h.eventId, item,
+      lessonOps.push({ op: 'update', calendarId: calId, eventId: h.eventId, item, note: h.description || '',
         desc: `${dayLabel(date)} ${hm(minOfDay(h.start))}–${hm(minOfDay(h.end))} ${h.title} → ${hm(item.start)}–${hm(item.end)} ${item.title}` });
     }
     rest.forEach((w, wi) => {
@@ -137,7 +137,7 @@ async function compare(settings, today = new Date()) {
 
 async function applyLessonOp(op) {
   if (op.op === 'add') return google.createShiftEvent(op.calendarId, toEvent(op.item), 'lesson');
-  if (op.op === 'update') return google.updateShiftEvent(op.calendarId, op.eventId, toEvent(op.item), 'lesson');
+  if (op.op === 'update') return google.updateShiftEvent(op.calendarId, op.eventId, toEvent(op.item), 'lesson', op.note);
   if (op.op === 'delete') return google.deleteEvent({ calendarId: op.calendarId, eventId: op.eventId });
   return null;
 }

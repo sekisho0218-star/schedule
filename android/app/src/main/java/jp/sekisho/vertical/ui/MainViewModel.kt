@@ -177,6 +177,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /* ---- シフト表から追加した予定の一括削除 ---- */
+    /** 一括削除の画面に出す一覧（null なら閉じている） */
+    var syncedList by mutableStateOf<List<ShiftSync.Synced>?>(null); private set
+    var syncedLoading by mutableStateOf(false); private set
+
+    fun openSyncedList() {
+        syncedLoading = true
+        viewModelScope.launch {
+            val r = runCatching { shiftSync.listSynced() }
+            syncedLoading = false
+            r.onSuccess { list ->
+                if (list.isEmpty()) message = "シフト表から追加した予定はありません" else syncedList = list
+            }.onFailure { message = "予定を読み込めませんでした：${it.message ?: it.javaClass.simpleName}" }
+        }
+    }
+
+    fun closeSyncedList() { syncedList = null }
+
+    fun deleteSynced(events: List<jp.sekisho.vertical.data.CalEvent>) {
+        syncedList = null
+        viewModelScope.launch {
+            val n = shiftSync.deleteSynced(events)
+            message = "${n}件の予定を削除しました。次の照合では、授業の変更をもう一度確認します"
+            shiftStatus = prefs.shiftLastMessage
+            reload()
+        }
+    }
+
     /** 確認画面を閉じる（あとで確認：内容は残し、次に画面を開いたときにまた表示） */
     fun closeShiftDialog() {
         shiftDialog = null
