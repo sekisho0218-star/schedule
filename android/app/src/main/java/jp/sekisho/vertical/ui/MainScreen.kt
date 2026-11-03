@@ -1,6 +1,7 @@
 package jp.sekisho.vertical.ui
 
 import android.Manifest
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -82,8 +83,10 @@ fun MainScreen(vm: MainViewModel) {
             }
         }
     }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LifecycleResumeEffect(Unit) {
         vm.reload()
+        vm.openShiftDialog() // バックグラウンドの照合で確認待ちができていれば表示
         onPauseOrDispose { }
     }
 
@@ -189,7 +192,31 @@ fun MainScreen(vm: MainViewModel) {
             tasksConnecting = vm.tasksConnecting,
             onConnectTasks = connectTasks,
             onDisconnectTasks = vm::disconnectTasks,
+            shift = ShiftSettingsUi(
+                enabled = vm.shiftEnabled,
+                url = vm.shiftUrl,
+                teacher = vm.shiftTeacher,
+                calendarId = vm.shiftCalendarId,
+                status = vm.shiftStatus,
+                running = vm.shiftRunning,
+                onChange = { en, url, teacher, calId ->
+                    // 通知で確認画面を開けるよう、オンにするとき通知の許可を求める
+                    if (en == true && Build.VERSION.SDK_INT >= 33) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    vm.setShiftSettings(en, url, teacher, calId)
+                },
+                onRunNow = { showSettings = false; vm.runShiftNow() },
+                onResetDismissed = vm::resetShiftDismissed,
+            ),
             onDismiss = { showSettings = false },
+        )
+    }
+    vm.shiftDialog?.let { p ->
+        ShiftDialog(
+            pending = p,
+            applied = vm.shiftApplied,
+            onApply = vm::applyShift,
+            onSkip = { vm.applyShift(false, emptySet()) },
+            onLater = vm::closeShiftDialog,
         )
     }
 }

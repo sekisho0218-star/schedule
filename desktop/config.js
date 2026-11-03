@@ -19,6 +19,7 @@ const defaults = {
   // シフト表との連携
   shift: {
     enabled: false,
+    auto: false, // このPCで30分ごとに自動照合（通常はスマホで自動照合するのでオフ）
     url: '',
     teacher: '赤松',
     calendarId: 'primary',

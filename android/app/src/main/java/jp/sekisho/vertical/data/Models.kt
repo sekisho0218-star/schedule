@@ -15,6 +15,8 @@ data class CalEvent(
     val color: Int,
     val calendarId: Long,
     val recurring: Boolean,
+    /** 繰り返し予定の1回分（変更・削除はその回だけにする） */
+    val series: Boolean = false,
     /** 時刻付きタスクをスケジュールに表示するとき：タスクのID と日付 */
     val taskId: String? = null,
     val taskDate: LocalDate? = null,

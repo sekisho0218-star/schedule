@@ -90,9 +90,11 @@ function start() {
 
   createTray();
 
-  // シフト表との照合：起動20秒後と、30分ごと
-  setTimeout(() => runShiftSync(false), 20_000);
-  setInterval(() => runShiftSync(false), 30 * 60_000);
+  // シフト表との照合：「このPCで自動照合」がオンのときだけ、起動20秒後と30分ごと
+  // （通常はスマホで自動照合し、PC では「今すぐ照合」だけ使う。両方で自動にすると二重登録のおそれ）
+  const autoShift = () => { if (config.load().shift.auto) runShiftSync(false); };
+  setTimeout(autoShift, 20_000);
+  setInterval(autoShift, 30 * 60_000);
 }
 
 function applyWindowSettings() {
@@ -133,7 +135,7 @@ function publicState() {
     view: cfg.view,
     version: app.getVersion(),
     shift: {
-      enabled: cfg.shift.enabled, url: cfg.shift.url, teacher: cfg.shift.teacher, calendarId: cfg.shift.calendarId,
+      enabled: cfg.shift.enabled, auto: cfg.shift.auto, url: cfg.shift.url, teacher: cfg.shift.teacher, calendarId: cfg.shift.calendarId,
       confirmedOnce: cfg.shift.confirmedOnce, lastRun: cfg.shift.lastRun, lastMessage: cfg.shift.lastMessage,
     },
   };
@@ -334,7 +336,7 @@ async function applyShiftChoices({ applyLessons, keys }) {
 
 ipcMain.handle('shift-settings', (_e, patch) => {
   const allowed = {};
-  for (const k of ['enabled', 'url', 'teacher', 'calendarId']) if (k in patch) allowed[k] = patch[k];
+  for (const k of ['enabled', 'auto', 'url', 'teacher', 'calendarId']) if (k in patch) allowed[k] = patch[k];
   // 照合の条件が変わったら、初回確認からやり直す
   if ('url' in allowed || 'teacher' in allowed || 'calendarId' in allowed) allowed.confirmedOnce = false;
   saveShift(allowed);

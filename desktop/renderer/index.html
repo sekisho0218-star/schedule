@@ -85,13 +85,15 @@
       </div>
 
       <h3>シフト表との連携</h3>
-      <label class="row"><input type="checkbox" name="shiftEnabled"> シフト表の予定を Google カレンダーに反映する</label>
+      <label class="row"><input type="checkbox" name="shiftEnabled"> シフト表の予定を Google カレンダーに反映する（「今すぐ照合」）</label>
+      <label class="row"><input type="checkbox" name="shiftAuto"> このPCでも30分ごとに自動で照合する</label>
+      <p class="hint">スマホ（Android 版）で自動照合している場合はオフのままにしてください（両方で自動にすると予定が二重になることがあります）。</p>
       <label>シフト表の URL<input name="shiftUrl" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off"></label>
       <div class="row2">
         <label>講師名<input name="shiftTeacher" autocomplete="off"></label>
         <label>反映先のカレンダー<select name="shiftCalendar"></select></label>
       </div>
-      <p class="hint">「シフト表(NEW)」タブの講師の列を30分ごとに確認します。授業は自動で反映（初回のみ確認）、授業以外とシフト表にない予定は確認してから反映します。</p>
+      <p class="hint">「シフト表(NEW)」タブの講師の列と照合します。授業は自動で反映（初回のみ確認）、授業以外とシフト表にない予定は確認してから反映します。</p>
       <p class="hint" id="shift-status"></p>
       <div class="dialog-actions left">
         <button type="button" id="btn-shift-run">今すぐ照合</button>

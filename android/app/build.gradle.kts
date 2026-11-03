@@ -12,8 +12,8 @@ android {
         applicationId = "jp.sekisho.vertical"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "2.2.0"
+        versionCode = 8
+        versionName = "2.3.0"
     }
 
     signingConfigs {
@@ -72,4 +72,6 @@ dependencies {
 
     // ウィジェットの定期更新・カレンダー変更検知
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+    testImplementation("junit:junit:4.13.2")
 }

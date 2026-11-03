@@ -562,6 +562,7 @@ function openSettings() {
   // シフト表との連携
   const sh = s.shift || {};
   f.shiftEnabled.checked = !!sh.enabled;
+  f.shiftAuto.checked = !!sh.auto;
   f.shiftUrl.value = sh.url || '';
   f.shiftTeacher.value = sh.teacher || '赤松';
   updateShiftStatus();
@@ -699,12 +700,13 @@ function bind() {
   // シフト表との連携
   const saveShiftSettings = async () => {
     state.app = await api.shiftSettings({
-      enabled: sf.shiftEnabled.checked, url: sf.shiftUrl.value.trim(),
+      enabled: sf.shiftEnabled.checked, auto: sf.shiftAuto.checked, url: sf.shiftUrl.value.trim(),
       teacher: sf.shiftTeacher.value.trim() || '赤松', calendarId: sf.shiftCalendar.value || 'primary',
     });
     updateShiftStatus();
   };
   sf.shiftEnabled.addEventListener('change', saveShiftSettings);
+  sf.shiftAuto.addEventListener('change', saveShiftSettings);
   sf.shiftUrl.addEventListener('change', saveShiftSettings);
   sf.shiftTeacher.addEventListener('change', saveShiftSettings);
   sf.shiftCalendar.addEventListener('change', saveShiftSettings);

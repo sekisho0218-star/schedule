@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
@@ -31,12 +32,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -46,6 +51,7 @@ import jp.sekisho.vertical.data.CalendarInfo
 import jp.sekisho.vertical.data.Dates
 import jp.sekisho.vertical.data.EventDraft
 import jp.sekisho.vertical.data.Task
+import jp.sekisho.vertical.shift.ShiftSync
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -249,6 +255,7 @@ fun SettingsDialog(
     tasksConnecting: Boolean,
     onConnectTasks: () -> Unit,
     onDisconnectTasks: () -> Unit,
+    shift: ShiftSettingsUi,
     onDismiss: () -> Unit,
 ) {
     val writable = calendars.filter { it.writable }
@@ -299,6 +306,8 @@ fun SettingsDialog(
                     }
                 }
 
+                ShiftSettingsSection(shift, writable)
+
                 val context = LocalContext.current
                 val version = remember {
                     runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
@@ -309,5 +318,148 @@ fun SettingsDialog(
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
+    )
+}
+
+
+/* ---------------- シフト表との連携 ---------------- */
+
+/** 設定画面のシフト表の欄 */
+data class ShiftSettingsUi(
+    val enabled: Boolean,
+    val url: String,
+    val teacher: String,
+    val calendarId: Long,
+    val status: String,
+    val running: Boolean,
+    val onChange: (enabled: Boolean?, url: String?, teacher: String?, calendarId: Long?) -> Unit,
+    val onRunNow: () -> Unit,
+    val onResetDismissed: () -> Unit,
+)
+
+@Composable
+private fun ShiftSettingsSection(st: ShiftSettingsUi, writable: List<CalendarInfo>) {
+    var url by remember { mutableStateOf(st.url) }
+    var teacher by remember { mutableStateOf(st.teacher) }
+    var calMenu by remember { mutableStateOf(false) }
+    Text("シフト表との連携", fontSize = 14.sp, modifier = Modifier.padding(top = 18.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("シフト表の予定をカレンダーに反映", fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Switch(checked = st.enabled, onCheckedChange = { st.onChange(it, url, teacher, null) })
+    }
+    OutlinedTextField(
+        value = url, onValueChange = { url = it }, label = { Text("シフト表の URL") }, singleLine = true,
+        modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused && url != st.url) st.onChange(null, url, null, null) },
+    )
+    OutlinedTextField(
+        value = teacher, onValueChange = { teacher = it }, label = { Text("講師名") }, singleLine = true,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+            .onFocusChanged { if (!it.isFocused && teacher != st.teacher) st.onChange(null, null, teacher, null) },
+    )
+    Box {
+        val cal = writable.firstOrNull { it.id == st.calendarId }
+        TextButton(onClick = { calMenu = true }) {
+            CalendarDot(cal?.color)
+            Spacer(Modifier.width(6.dp))
+            Text("反映先：" + (cal?.let { "${it.name}（${it.accountName}）" } ?: "新しい予定の保存先と同じ"), fontSize = 13.sp)
+        }
+        DropdownMenu(expanded = calMenu, onDismissRequest = { calMenu = false }) {
+            DropdownMenuItem(text = { Text("新しい予定の保存先と同じ") }, onClick = { st.onChange(null, null, null, -1L); calMenu = false })
+            writable.forEach { c ->
+                DropdownMenuItem(
+                    leadingIcon = { CalendarDot(c.color) },
+                    text = { Text("${c.name}（${c.accountName}）") },
+                    onClick = { st.onChange(null, null, null, c.id); calMenu = false },
+                )
+            }
+        }
+    }
+    Text(
+        "「シフト表(NEW)」タブの講師の列を30分ごとに確認します。授業は自動で反映（初回のみ確認）、授業以外とシフト表にない予定は確認してから反映します。",
+        fontSize = 12.sp, color = c(Palette.SUB),
+    )
+    if (st.status.isNotBlank()) Text("前回の照合：${st.status}", fontSize = 12.sp, color = c(Palette.SUB), modifier = Modifier.padding(top = 4.dp))
+    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(enabled = !st.running, onClick = {
+            st.onChange(null, url, teacher, null)
+            st.onRunNow()
+        }) { Text(if (st.running) "照合中…" else "今すぐ照合") }
+        TextButton(onClick = st.onResetDismissed) { Text("「反映しない」をリセット", fontSize = 12.sp) }
+    }
+}
+
+/** シフト表との違い（確認画面） */
+@Composable
+fun ShiftDialog(
+    pending: ShiftSync.Pending,
+    applied: List<String>,
+    onApply: (applyLessons: Boolean, keys: Set<String>) -> Unit,
+    onSkip: () -> Unit,
+    onLater: () -> Unit,
+) {
+    var applyLessons by remember(pending) { mutableStateOf(true) }
+    val checked = remember(pending) { mutableStateMapOf<String, Boolean>().apply { pending.proposals.forEach { put(it.key, it.checked) } } }
+    val opLabel = mapOf("add" to "追加", "update" to "変更", "delete" to "削除", "remove" to "削除")
+    @Composable
+    fun Tag(op: String) {
+        val (bg, fg) = when (op) {
+            "add" -> Color(0xFFE3F1DC) to Color(0xFF2F6B1F)
+            "update" -> Color(0xFFFFF1C9) to Color(0xFF7A5B00)
+            else -> Color(0xFFFBE1DF) to Color(0xFFA1342B)
+        }
+        Text(opLabel[op] ?: op, fontSize = 10.sp, color = fg,
+            modifier = Modifier.padding(end = 4.dp).clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 4.dp))
+    }
+    @Composable
+    fun Head(t: String) = Text(t, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+
+    AlertDialog(
+        onDismissRequest = onLater,
+        title = { Text("シフト表との違い") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (applied.isNotEmpty()) {
+                    Head("自動で反映した授業（${applied.size}件）")
+                    applied.forEach { Text(it, fontSize = 12.sp) }
+                }
+                if (pending.lessons.isNotEmpty()) {
+                    Head("授業の変更（初回のみ確認。以後は自動で反映）")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = applyLessons, onCheckedChange = { applyLessons = it })
+                        Text("次の${pending.lessons.size}件を反映し、今後は授業を自動で反映する", fontSize = 12.sp)
+                    }
+                    pending.lessons.forEach { op ->
+                        Row(verticalAlignment = Alignment.CenterVertically) { Tag(op.op); Text(op.desc, fontSize = 12.sp) }
+                    }
+                }
+                val adds = pending.proposals.filter { it.type == "add" }
+                val rms = pending.proposals.filter { it.type == "remove" }
+                @Composable
+                fun Item(p: ShiftSync.Proposal) = Row(
+                    Modifier.fillMaxWidth().clickable { checked[p.key] = !(checked[p.key] ?: false) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = checked[p.key] ?: false, onCheckedChange = { checked[p.key] = it })
+                    Tag(p.type)
+                    Text(p.desc, fontSize = 12.sp)
+                }
+                if (adds.isNotEmpty()) {
+                    Head("授業以外は反映しますか？")
+                    adds.forEach { Item(it) }
+                }
+                if (rms.isNotEmpty()) {
+                    Head("シフト表にない予定です。削除しますか？")
+                    rms.forEach { Item(it) }
+                }
+                if (pending.notes.isNotEmpty()) {
+                    Text("読み取れなかった書き込み：" + pending.notes.take(5).joinToString("、"), fontSize = 11.sp, color = c(Palette.SUB),
+                        modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onApply(applyLessons, checked.filterValues { it }.keys) }) { Text("チェックした項目を反映") }
+        },
+        dismissButton = { TextButton(onClick = onSkip) { Text("反映しない") } },
     )
 }

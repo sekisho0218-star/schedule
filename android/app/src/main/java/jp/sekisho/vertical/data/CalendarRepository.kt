@@ -109,6 +109,7 @@ class CalendarRepository(context: Context) {
                         color = c.getInt(6),
                         calendarId = c.getLong(7),
                         recurring = !c.isNull(8) || !c.isNull(9),
+                        series = !c.isNull(8),
                     )
                 }
             }
@@ -132,6 +133,27 @@ class CalendarRepository(context: Context) {
         if (!hasWritePermission()) return false
         val uri = ContentUris.withAppendedId(Events.CONTENT_URI, eventId)
         return runCatching { cr.delete(uri, null, null) > 0 }.getOrDefault(false)
+    }
+
+    /** 予定を1回分だけ変更（繰り返し予定はその回だけの例外を作る） */
+    fun updateInstance(ev: CalEvent, draft: EventDraft): Boolean {
+        if (!ev.series) return update(ev.eventId, draft)
+        if (!hasWritePermission()) return false
+        val values = toValues(draft).apply { put(Events.ORIGINAL_INSTANCE_TIME, ev.begin) }
+        val uri = ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, ev.eventId)
+        return runCatching { cr.insert(uri, values) != null }.getOrDefault(false)
+    }
+
+    /** 予定を1回分だけ削除（繰り返し予定はその回だけ取り消す） */
+    fun deleteInstance(ev: CalEvent): Boolean {
+        if (!ev.series) return delete(ev.eventId)
+        if (!hasWritePermission()) return false
+        val values = ContentValues().apply {
+            put(Events.ORIGINAL_INSTANCE_TIME, ev.begin)
+            put(Events.STATUS, Events.STATUS_CANCELED)
+        }
+        val uri = ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, ev.eventId)
+        return runCatching { cr.insert(uri, values) != null }.getOrDefault(false)
     }
 
     /** Google アカウントの同期を今すぐ実行するよう OS に依頼する */

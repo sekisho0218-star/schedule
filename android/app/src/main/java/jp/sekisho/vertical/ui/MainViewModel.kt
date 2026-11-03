@@ -19,6 +19,8 @@ import jp.sekisho.vertical.data.EventDraft
 import jp.sekisho.vertical.data.Prefs
 import jp.sekisho.vertical.data.Task
 import jp.sekisho.vertical.data.TaskRepository
+import jp.sekisho.vertical.shift.ShiftSync
+import jp.sekisho.vertical.shift.ShiftWorker
 import jp.sekisho.vertical.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +43,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var defaultCalendarId by mutableStateOf(prefs.defaultCalendarId); private set
     var message by mutableStateOf<String?>(null)
     var tasksGoogle by mutableStateOf(taskRepo.googleMode); private set
+
+    /* ---- シフト表との連携 ---- */
+    private val shiftSync = ShiftSync(app)
+    var shiftEnabled by mutableStateOf(prefs.shiftEnabled); private set
+    var shiftUrl by mutableStateOf(prefs.shiftUrl); private set
+    var shiftTeacher by mutableStateOf(prefs.shiftTeacher); private set
+    var shiftCalendarId by mutableStateOf(prefs.shiftCalendarId); private set
+    var shiftStatus by mutableStateOf(prefs.shiftLastMessage); private set
+    var shiftRunning by mutableStateOf(false); private set
+    /** 確認画面に出す内容（null なら閉じている） */
+    var shiftDialog by mutableStateOf<ShiftSync.Pending?>(null); private set
+    var shiftApplied by mutableStateOf<List<String>>(emptyList()); private set
     var tasksConnecting by mutableStateOf(false); private set
 
     private var loadJob: Job? = null
@@ -106,6 +120,71 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             )
             reload()
         }
+    }
+
+    fun setShiftSettings(enabled: Boolean? = null, url: String? = null, teacher: String? = null, calendarId: Long? = null) {
+        val ctx = getApplication<Application>()
+        // 照合の条件が変わったら、初回確認からやり直す
+        if ((url != null && url != prefs.shiftUrl) || (teacher != null && teacher != prefs.shiftTeacher) ||
+            (calendarId != null && calendarId != prefs.shiftCalendarId)) prefs.shiftConfirmedOnce = false
+        url?.let { prefs.shiftUrl = it.trim(); shiftUrl = prefs.shiftUrl }
+        teacher?.let { prefs.shiftTeacher = it.trim().ifEmpty { "赤松" }; shiftTeacher = prefs.shiftTeacher }
+        calendarId?.let { prefs.shiftCalendarId = it; shiftCalendarId = it }
+        enabled?.let {
+            prefs.shiftEnabled = it; shiftEnabled = it
+            if (it) ShiftWorker.schedule(ctx) else ShiftWorker.cancel(ctx)
+        }
+    }
+
+    /** 今すぐ照合 */
+    fun runShiftNow() {
+        if (shiftRunning) return
+        shiftRunning = true
+        viewModelScope.launch {
+            val r = runCatching { shiftSync.run() }
+            shiftRunning = false
+            shiftStatus = prefs.shiftLastMessage
+            r.onSuccess { res ->
+                shiftApplied = res.applied
+                when {
+                    !res.pending.isEmpty -> shiftDialog = res.pending
+                    res.applied.isNotEmpty() -> message = "シフト表の授業を${res.applied.size}件反映しました"
+                    else -> message = "シフト表とカレンダーに違いはありません"
+                }
+                if (res.failed.isNotEmpty()) message = "反映できなかった予定が${res.failed.size}件あります"
+                reload()
+            }.onFailure { message = "シフト表：${it.message ?: it.javaClass.simpleName}" }
+        }
+    }
+
+    /** 確認待ちがあれば確認画面を出す（通知から開いたとき・画面に戻ったとき） */
+    fun openShiftDialog() {
+        val p = shiftSync.pending()
+        shiftStatus = prefs.shiftLastMessage
+        if (!p.isEmpty) { shiftApplied = emptyList(); shiftDialog = p }
+    }
+
+    fun applyShift(applyLessons: Boolean, keys: Set<String>) {
+        shiftDialog = null
+        viewModelScope.launch {
+            val (applied, failed) = shiftSync.applyChoices(applyLessons, keys)
+            message = when {
+                failed.isNotEmpty() -> "反映できなかった予定が${failed.size}件あります"
+                applied.isNotEmpty() -> "${applied.size}件をカレンダーに反映しました"
+                else -> null
+            }
+            reload()
+        }
+    }
+
+    /** 確認画面を閉じる（あとで確認：内容は残し、次に画面を開いたときにまた表示） */
+    fun closeShiftDialog() {
+        shiftDialog = null
+    }
+
+    fun resetShiftDismissed() {
+        prefs.shiftDismissed = emptySet()
+        message = "「反映しない」にした項目を、次回の照合でもう一度確認します"
     }
 
     fun disconnectTasks() {
