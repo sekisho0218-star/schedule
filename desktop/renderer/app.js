@@ -91,9 +91,10 @@ function eventsOn(day) {
 }
 
 /* ---------- 文字の拡大率：1日分の列の幅に比例（最大1.6倍） ---------- */
+// 画面の1/4（幅およそ960px）で 1.0。狭いと少し小さく、広いと少し大きくする
 function updateScale() {
-  const colW = (window.innerWidth - 12 - 38) / 7;
-  const ts = Math.min(1.6, Math.max(1, colW / 70));
+  const colW = (window.innerWidth - 10 - 30) / 7;
+  const ts = Math.min(1.3, Math.max(0.9, colW / 130));
   document.documentElement.style.setProperty('--ts', ts.toFixed(3));
 }
 
@@ -152,12 +153,14 @@ function renderWeek(root) {
       const e = el('div', 'event ev-style');
       styleEvent(e, it.ev);
       e.style.top = `${(top / totalMin) * 100}%`;
-      e.style.height = `max(calc(18px * var(--ts)), calc(${((bottom - top) / totalMin) * 100}% - 3px))`;
+      e.style.height = `max(calc(16px * var(--ts)), calc(${((bottom - top) / totalMin) * 100}% - 2px))`;
       e.style.marginTop = '1px';
       const w = 100 / it.ncols;
       e.style.left = `calc(${w * it.col}% + 3px)`;
       e.style.width = `calc(${w}% - 6px)`;
-      e.append(document.createTextNode(it.ev.title));
+      const name = el('div', 'name', it.ev.title);
+      e.dataset.mins = String(bottom - top);
+      e.append(name);
       e.title = `${hm(new Date(it.ev.start))}–${hm(new Date(it.ev.end))} ${it.ev.title}${it.ev.calendarName ? `（${it.ev.calendarName}）` : ''}`;
       e.addEventListener('click', (ev) => { ev.stopPropagation(); openEventDialog(it.ev); });
       col.append(e);
@@ -192,7 +195,15 @@ function renderWeek(root) {
   // 1時間の高さ：スクロールせずに 8〜24時が収まるように
   requestAnimationFrame(() => {
     const h = scroll.clientHeight;
-    if (h > 0) document.documentElement.style.setProperty('--hour-h', `${Math.max(24, h / 16)}px`);
+    const hourH = Math.max(18, h / 16);
+    if (h > 0) document.documentElement.style.setProperty('--hour-h', `${hourH}px`);
+    // 予定ブロックの高さに入る行数だけ予定名を表示（入りきらない分は「…」）
+    scroll.querySelectorAll('.event').forEach((ev) => {
+      const name = ev.firstChild;
+      const lineH = parseFloat(getComputedStyle(name).lineHeight) || 14;
+      const boxH = Math.max(ev.clientHeight, (Number(ev.dataset.mins) / 60) * hourH) - 1;
+      name.style.webkitLineClamp = String(Math.max(1, Math.floor(boxH / lineH)));
+    });
   });
 }
 
@@ -261,7 +272,7 @@ function renderMonth(root) {
   for (let i = 0; i < 7; i++) { const d = addDays(gridStart, i); grid.append(el('div', `mhead ${dayKind(d)}`, DOW[d.getDay()])); }
   const ts = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ts')) || 1;
   const cellH = (root.clientHeight - 30) / weeks;
-  const maxItems = Math.max(1, Math.floor((cellH - 40 * ts) / (16 * ts)));
+  const maxItems = Math.max(1, Math.floor((cellH - 34 * ts) / (15 * ts)));
 
   for (let i = 0; i < weeks * 7; i++) {
     const d = addDays(gridStart, i);

@@ -21,9 +21,10 @@ const iconPath = path.join(__dirname, 'build', 'icon.png');
 
 function defaultBounds() {
   const area = screen.getPrimaryDisplay().workArea;
-  const width = Math.min(1100, Math.round(area.width * 0.6));
-  const height = Math.min(820, Math.round(area.height * 0.85));
-  return { width, height, x: area.x + area.width - width - 20, y: area.y + 20 };
+  // 初期サイズは画面の1/4
+  const width = Math.round(area.width / 2);
+  const height = Math.round(area.height / 2);
+  return { width, height, x: area.x + area.width - width, y: area.y };
 }
 
 /** 保存した位置が今の画面の外なら初期位置に戻す */
@@ -41,8 +42,8 @@ function start() {
   const cfg = config.load();
   win = new BrowserWindow({
     ...validBounds(cfg.bounds),
-    minWidth: 520,
-    minHeight: 420,
+    minWidth: 480,
+    minHeight: 360,
     frame: false,
     show: false,
     skipTaskbar: true,
