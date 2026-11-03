@@ -559,7 +559,77 @@ function openSettings() {
   $('#google-state').textContent = s.signedIn ? '状態：ログイン済み（予定・タスクを同期中）' : '状態：未ログイン';
   $('#btn-signout').hidden = !s.signedIn;
   $('#app-version').textContent = s.version ? `バージョン ${s.version}` : '';
+  // シフト表との連携
+  const sh = s.shift || {};
+  f.shiftEnabled.checked = !!sh.enabled;
+  f.shiftUrl.value = sh.url || '';
+  f.shiftTeacher.value = sh.teacher || '赤松';
+  updateShiftStatus();
+  const sel = f.shiftCalendar;
+  sel.replaceChildren(new Option('メインのカレンダー', 'primary'));
+  sel.value = 'primary';
+  if (s.signedIn) {
+    api.shiftCalendars().then((r) => {
+      if (!r.ok) return;
+      for (const c of r.data) if (!c.primary) sel.append(new Option(c.name, c.id));
+      sel.value = sh.calendarId || 'primary';
+    });
+  }
   $('#settings-dialog').showModal();
+}
+
+/* ---------- シフト表との違い ---------- */
+function updateShiftStatus() {
+  const sh = state.app?.shift || {};
+  const last = sh.lastRun ? new Date(sh.lastRun) : null;
+  $('#shift-status').textContent = !sh.enabled ? '状態：オフ'
+    : last ? `前回の照合：${last.getMonth() + 1}/${last.getDate()} ${hm(last)}　${sh.lastMessage || ''}`
+    : '状態：オン（まだ照合していません）';
+}
+
+const OP_LABEL = { add: '追加', update: '変更', delete: '削除', remove: '削除' };
+let shiftDialogResult = null;
+
+function showShiftResult(r) {
+  if (!r) return;
+  if (!r.ok) { if (r.error) toast(`シフト表：${r.error}`, 6000); return; }
+  const pending = r.lessonOps.length + r.proposals.length;
+  if (r.applied.length) toast(`シフト表の授業を${r.applied.length}件反映しました`, 5000);
+  if (r.failed?.length) toast(`反映できなかった予定が${r.failed.length}件あります`, 6000);
+  if (!pending) {
+    if (r.manual && !r.applied.length) toast('シフト表とカレンダーに違いはありません');
+    return;
+  }
+  shiftDialogResult = r;
+  const sec = (title, inner) => `<div class="shift-sec"><h3>${title}</h3><div class="shift-list">${inner}</div></div>`;
+  const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  $('#shift-applied').innerHTML = r.applied.length
+    ? sec(`自動で反映した授業（${r.applied.length}件）`, r.applied.map((d) => `<div>${esc(d)}</div>`).join('')) : '';
+  $('#shift-lessons').innerHTML = r.lessonOps.length
+    ? sec('授業の変更（初回のみ確認。以後は自動で反映）',
+      `<label><input type="checkbox" id="shift-apply-lessons" checked> 次の${r.lessonOps.length}件を反映し、今後は授業を自動で反映する</label>`
+      + r.lessonOps.map((o) => `<div><span class="tag ${o.op}">${OP_LABEL[o.op]}</span>${esc(o.desc)}</div>`).join('')) : '';
+  const adds = r.proposals.filter((p) => p.type === 'add');
+  const rms = r.proposals.filter((p) => p.type === 'remove');
+  const item = (p) => `<label><input type="checkbox" data-key="${esc(p.key)}" ${p.checked ? 'checked' : ''}><span><span class="tag ${p.type}">${OP_LABEL[p.type]}</span>${esc(p.desc)}</span></label>`;
+  $('#shift-proposals').innerHTML = (adds.length ? sec('授業以外は反映しますか？（シフト表にあってカレンダーにない予定）', adds.map(item).join('')) : '')
+    + (rms.length ? sec('シフト表にない予定です。削除しますか？', rms.map(item).join('')) : '');
+  $('#shift-notes').innerHTML = r.notes?.length
+    ? `<p class="hint">読み取れなかった書き込み：${esc(r.notes.slice(0, 5).join('、'))}${r.notes.length > 5 ? ' ほか' : ''}</p>` : '';
+  if (!$('#shift-dialog').open) $('#shift-dialog').showModal();
+}
+
+async function submitShift(apply) {
+  const r = shiftDialogResult; shiftDialogResult = null;
+  $('#shift-dialog').close();
+  if (!r) return;
+  const keys = apply ? [...document.querySelectorAll('#shift-proposals input[data-key]:checked')].map((i) => i.dataset.key) : [];
+  const applyLessons = apply && !!document.querySelector('#shift-apply-lessons')?.checked;
+  const res = await api.shiftApply({ applyLessons, keys });
+  if (res.applied?.length) toast(`${res.applied.length}件をカレンダーに反映しました`);
+  if (res.failed?.length) toast(`反映できなかった予定が${res.failed.length}件あります`, 6000);
+  state.app = await api.state();
+  reload();
 }
 
 /* ---------- イベント登録 ---------- */
@@ -626,6 +696,34 @@ function bind() {
     state.app = await api.signOut(); state.events = []; state.tasks = {};
     $('#settings-dialog').close(); render();
   });
+  // シフト表との連携
+  const saveShiftSettings = async () => {
+    state.app = await api.shiftSettings({
+      enabled: sf.shiftEnabled.checked, url: sf.shiftUrl.value.trim(),
+      teacher: sf.shiftTeacher.value.trim() || '赤松', calendarId: sf.shiftCalendar.value || 'primary',
+    });
+    updateShiftStatus();
+  };
+  sf.shiftEnabled.addEventListener('change', saveShiftSettings);
+  sf.shiftUrl.addEventListener('change', saveShiftSettings);
+  sf.shiftTeacher.addEventListener('change', saveShiftSettings);
+  sf.shiftCalendar.addEventListener('change', saveShiftSettings);
+  $('#btn-shift-run').addEventListener('click', async () => {
+    await saveShiftSettings();
+    toast('シフト表と照合しています…', 8000);
+    const r = await api.shiftRun();
+    state.app = await api.state(); updateShiftStatus();
+    $('#settings-dialog').close();
+    showShiftResult(r);
+  });
+  $('#btn-shift-reset').addEventListener('click', async () => {
+    await api.shiftResetDismissed();
+    toast('「反映しない」にした項目を、次回の照合でもう一度確認します');
+  });
+  $('#shift-form').addEventListener('submit', (e) => { e.preventDefault(); submitShift(true); });
+  $('#btn-shift-skip').addEventListener('click', () => submitShift(false));
+  api.onShiftResult((r) => { showShiftResult(r); api.state().then((st) => { state.app = st; }); });
+
   $('#link-readme').addEventListener('click', (e) => {
     e.preventDefault();
     api.openExternal('https://github.com/sekisho0218-star/schedule/blob/ccr-71be2548-2602dq/desktop/README.md');

@@ -16,6 +16,17 @@ const defaults = {
   autostart: false,
   view: 'week',
   bounds: null,
+  // シフト表との連携
+  shift: {
+    enabled: false,
+    url: '',
+    teacher: '赤松',
+    calendarId: 'primary',
+    confirmedOnce: false, // 初回は授業の変更も確認してから反映
+    dismissed: [], // 「反映しない」を選んだ項目（次回から聞かない）
+    lastRun: null,
+    lastMessage: '',
+  },
 };
 
 let cache = null;
@@ -23,9 +34,10 @@ let cache = null;
 function load() {
   if (cache) return cache;
   try {
-    cache = { ...defaults, ...JSON.parse(fs.readFileSync(file(), 'utf8')) };
+    const saved = JSON.parse(fs.readFileSync(file(), 'utf8'));
+    cache = { ...defaults, ...saved, shift: { ...defaults.shift, ...(saved.shift || {}) } };
   } catch {
-    cache = { ...defaults };
+    cache = { ...defaults, shift: { ...defaults.shift } };
   }
   return cache;
 }

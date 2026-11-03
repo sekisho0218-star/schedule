@@ -1,8 +1,9 @@
 // バーチカル手帳（Windows デスクトップ版）メインプロセス
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell, Notification } = require('electron');
 const path = require('node:path');
 const config = require('./config');
 const google = require('./google');
+const shiftSync = require('./shiftsync');
 
 let win = null;
 let tray = null;
@@ -88,6 +89,10 @@ function start() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 
   createTray();
+
+  // シフト表との照合：起動20秒後と、30分ごと
+  setTimeout(() => runShiftSync(false), 20_000);
+  setInterval(() => runShiftSync(false), 30 * 60_000);
 }
 
 function applyWindowSettings() {
@@ -127,6 +132,10 @@ function publicState() {
     autostart: cfg.autostart,
     view: cfg.view,
     version: app.getVersion(),
+    shift: {
+      enabled: cfg.shift.enabled, url: cfg.shift.url, teacher: cfg.shift.teacher, calendarId: cfg.shift.calendarId,
+      confirmedOnce: cfg.shift.confirmedOnce, lastRun: cfg.shift.lastRun, lastMessage: cfg.shift.lastMessage,
+    },
   };
 }
 
@@ -238,6 +247,103 @@ ipcMain.handle('hide', () => win.hide());
 ipcMain.handle('open-external', (_e, url) => {
   if (/^https:\/\//.test(url)) shell.openExternal(url);
 });
+
+/* ---------------- シフト表との照合 ---------------- */
+
+let shiftRunning = false;
+let shiftPending = null; // 確認待ちの内容 { lessonOps, proposals }
+
+function saveShift(patch) {
+  config.save({ shift: { ...config.load().shift, ...patch } });
+}
+
+/**
+ * シフト表と Google カレンダーを照合する。
+ * 授業の違いは自動で反映（初回だけは確認）。授業以外とシフト表にない予定は、画面で確認してから反映。
+ */
+async function runShiftSync(manual) {
+  const st = config.load().shift;
+  if (!st.enabled || !st.url || !google.isSignedIn() || shiftRunning) {
+    if (manual && !google.isSignedIn()) return { ok: false, error: 'Google にログインしてください' };
+    if (manual && (!st.enabled || !st.url)) return { ok: false, error: '設定でシフト表の URL を入力し、連携をオンにしてください' };
+    return { ok: false, error: '照合中です' };
+  }
+  shiftRunning = true;
+  try {
+    const r = await shiftSync.compare(st);
+    const dismissed = new Set(st.dismissed);
+    const proposals = r.proposals.filter((p) => !dismissed.has(p.key));
+    const applied = [];
+    const failed = [];
+    let lessonOps = [];
+    if (st.confirmedOnce) {
+      for (const op of r.lessonOps) {
+        try { await shiftSync.applyLessonOp(op); applied.push(op.desc); } catch (e) { failed.push(`${op.desc}（${e.message}）`); }
+      }
+    } else {
+      lessonOps = r.lessonOps; // 初回は授業の変更も確認してから
+    }
+    shiftPending = { lessonOps, proposals };
+    const parts = [];
+    if (applied.length) parts.push(`授業を${applied.length}件反映`);
+    if (lessonOps.length || proposals.length) parts.push(`確認待ち${lessonOps.length + proposals.length}件`);
+    if (!parts.length) parts.push('違いはありません');
+    saveShift({ lastRun: new Date().toISOString(), lastMessage: parts.join('・') });
+    const result = { ok: true, applied, failed, lessonOps: lessonOps.map(({ op, desc }) => ({ op, desc })),
+      proposals: proposals.map(({ key, type, desc, checked }) => ({ key, type, desc, checked })), notes: r.notes, manual };
+    win?.webContents.send('shift-result', result);
+    if (applied.length) win?.webContents.send('refresh');
+    if (!manual && (lessonOps.length || proposals.length) && Notification.isSupported()) {
+      const n = new Notification({ title: 'バーチカル手帳', body: 'シフト表に、反映するか確認が必要な予定があります。', icon: iconPath });
+      n.on('click', () => { showWindow(); win.webContents.send('shift-result', result); });
+      n.show();
+    }
+    return result;
+  } catch (e) {
+    saveShift({ lastRun: new Date().toISOString(), lastMessage: `エラー：${e.message}` });
+    if (e.code === 'NEED_LOGIN') promptReLogin();
+    return { ok: false, error: e.message };
+  } finally {
+    shiftRunning = false;
+  }
+}
+
+/** 確認画面の結果を反映。チェックしなかった項目は次回から聞かない */
+async function applyShiftChoices({ applyLessons, keys }) {
+  if (!shiftPending) return { ok: true, applied: [] };
+  const { lessonOps, proposals } = shiftPending;
+  shiftPending = null;
+  const chosen = new Set(keys);
+  const applied = []; const failed = [];
+  if (applyLessons && lessonOps.length) {
+    for (const op of lessonOps) {
+      try { await shiftSync.applyLessonOp(op); applied.push(op.desc); } catch (e) { failed.push(`${op.desc}（${e.message}）`); }
+    }
+    saveShift({ confirmedOnce: true });
+  }
+  for (const p of proposals) {
+    if (!chosen.has(p.key)) continue;
+    try { await shiftSync.applyProposal(p); applied.push(p.desc); } catch (e) { failed.push(`${p.desc}（${e.message}）`); }
+  }
+  const st = config.load().shift;
+  const dismissed = [...new Set([...st.dismissed, ...proposals.filter((p) => !chosen.has(p.key)).map((p) => p.key)])].slice(-1000);
+  saveShift({ dismissed });
+  win?.webContents.send('refresh');
+  return { ok: true, applied, failed };
+}
+
+ipcMain.handle('shift-settings', (_e, patch) => {
+  const allowed = {};
+  for (const k of ['enabled', 'url', 'teacher', 'calendarId']) if (k in patch) allowed[k] = patch[k];
+  // 照合の条件が変わったら、初回確認からやり直す
+  if ('url' in allowed || 'teacher' in allowed || 'calendarId' in allowed) allowed.confirmedOnce = false;
+  saveShift(allowed);
+  return publicState();
+});
+ipcMain.handle('shift-run', () => runShiftSync(true));
+ipcMain.handle('shift-apply', (_e, choice) => applyShiftChoices(choice));
+ipcMain.handle('shift-calendars', wrap(() => google.writableCalendars()));
+ipcMain.handle('shift-reset-dismissed', () => { saveShift({ dismissed: [] }); return true; });
 
 app.on('before-quit', () => { quitting = true; });
 app.on('window-all-closed', (e) => e.preventDefault());

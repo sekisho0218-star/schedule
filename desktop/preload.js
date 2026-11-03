@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld('api', {
   completeTask: (id) => ipcRenderer.invoke('complete-task', id),
   hide: () => ipcRenderer.invoke('hide'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  shiftSettings: (patch) => ipcRenderer.invoke('shift-settings', patch),
+  shiftRun: () => ipcRenderer.invoke('shift-run'),
+  shiftApply: (choice) => ipcRenderer.invoke('shift-apply', choice),
+  shiftCalendars: () => ipcRenderer.invoke('shift-calendars'),
+  shiftResetDismissed: () => ipcRenderer.invoke('shift-reset-dismissed'),
+  onShiftResult: (cb) => ipcRenderer.on('shift-result', (_e, r) => cb(r)),
   onRefresh: (cb) => ipcRenderer.on('refresh', () => cb()),
   onState: (cb) => ipcRenderer.on('state', (_e, s) => cb(s)),
 });

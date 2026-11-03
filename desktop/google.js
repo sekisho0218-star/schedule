@@ -174,6 +174,8 @@ async function listEvents(fromIso, toIso) {
           color: eventColors[e.colorId]?.background || cal.backgroundColor || '#4a72b5',
           writable: cal.accessRole === 'owner' || cal.accessRole === 'writer',
           recurring: !!e.recurringEventId,
+          shift: e.extendedProperties?.private?.vtShift || null, // シフト表から登録した予定
+          primary: !!cal.primary,
         });
       }
       pageToken = data.nextPageToken || '';
@@ -197,6 +199,26 @@ function toGoogleEvent(ev) {
 }
 
 const createEvent = (ev) => api('POST', `${CAL}/calendars/primary/events`, toGoogleEvent(ev));
+
+/** シフト表から登録する予定（あとで見分けられるよう印を付ける） */
+function shiftBody(ev, kind) {
+  return {
+    ...toGoogleEvent(ev),
+    description: 'シフト表から自動登録（バーチカル手帳）',
+    extendedProperties: { private: { vtShift: kind } },
+  };
+}
+const createShiftEvent = (calendarId, ev, kind) =>
+  api('POST', `${CAL}/calendars/${encodeURIComponent(calendarId)}/events`, shiftBody(ev, kind));
+const updateShiftEvent = (calendarId, eventId, ev, kind) =>
+  api('PATCH', `${CAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, shiftBody(ev, kind));
+
+/** 書き込めるカレンダーの一覧（設定画面用） */
+async function writableCalendars() {
+  return (await listCalendars())
+    .filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer')
+    .map((c) => ({ id: c.id, name: c.summaryOverride || c.summary, primary: !!c.primary }));
+}
 const updateEvent = (ev) =>
   api('PATCH', `${CAL}/calendars/${encodeURIComponent(ev.calendarId)}/events/${encodeURIComponent(ev.eventId)}`, toGoogleEvent(ev));
 const deleteEvent = (ev) =>
@@ -249,5 +271,6 @@ function reopenSignIn() {
 module.exports = {
   isSignedIn, signIn, signOut, reopenSignIn,
   listEvents, createEvent, updateEvent, deleteEvent,
+  createShiftEvent, updateShiftEvent, writableCalendars,
   listTasks, addTask, updateTask, completeTask,
 };

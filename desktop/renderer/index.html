@@ -84,6 +84,20 @@
         <button type="button" id="btn-signout" class="danger">ログアウト</button>
       </div>
 
+      <h3>シフト表との連携</h3>
+      <label class="row"><input type="checkbox" name="shiftEnabled"> シフト表の予定を Google カレンダーに反映する</label>
+      <label>シフト表の URL<input name="shiftUrl" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off"></label>
+      <div class="row2">
+        <label>講師名<input name="shiftTeacher" autocomplete="off"></label>
+        <label>反映先のカレンダー<select name="shiftCalendar"></select></label>
+      </div>
+      <p class="hint">「シフト表(NEW)」タブの講師の列を30分ごとに確認します。授業は自動で反映（初回のみ確認）、授業以外とシフト表にない予定は確認してから反映します。</p>
+      <p class="hint" id="shift-status"></p>
+      <div class="dialog-actions left">
+        <button type="button" id="btn-shift-run">今すぐ照合</button>
+        <button type="button" id="btn-shift-reset">「反映しない」をリセット</button>
+      </div>
+
       <h3>表示</h3>
       <label class="row"><input type="radio" name="mode" value="desktop"> デスクトップに貼り付け（他のウィンドウの後ろ）</label>
       <label class="row"><input type="radio" name="mode" value="top"> 常に手前に表示</label>
@@ -95,6 +109,22 @@
         <span class="hint" id="app-version"></span>
         <span class="spacer"></span>
         <button type="submit" class="primary">閉じる</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- シフト表との違い -->
+  <dialog id="shift-dialog">
+    <form id="shift-form" method="dialog">
+      <h2>シフト表との違い</h2>
+      <div id="shift-applied"></div>
+      <div id="shift-lessons"></div>
+      <div id="shift-proposals"></div>
+      <div id="shift-notes"></div>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" id="btn-shift-skip">反映しない</button>
+        <button type="submit" class="primary">チェックした項目を反映</button>
       </div>
     </form>
   </dialog>
