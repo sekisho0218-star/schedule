@@ -19,7 +19,42 @@ const combine = (dateStr, timeStr) => { const d = parseYmd(dateStr); const [h, m
 
 const START_HOUR = 8;
 const END_HOUR = 24;
-const TASKS_PER_DAY = 5;
+const TASKS_PER_DAY = 3; // タスクリスト（時刻のないタスク）の件数
+
+/*
+ * タスク名の先頭の時刻を読み取る（Google Tasks API はタスクの時刻を扱えないため）。
+ * 「15:00 教材発注」→ 15:00〜15:30、「15:00-16:30 面談準備」→ 15:00〜16:30 としてスケジュールに表示
+ */
+const TASK_COLOR = '#8d8778';
+function parseTaskTime(text) {
+  const t = text.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  const m = t.match(/^\s*(\d{1,2})[:：](\d{2})(?:\s*[-~〜～–ー−]\s*(\d{1,2})[:：](\d{2}))?\s*(.*)$/);
+  if (!m) return null;
+  const h = Number(m[1]); const mi = Number(m[2]);
+  if (h > 23 || mi > 59) return null;
+  const start = h * 60 + mi;
+  let end = m[3] ? Number(m[3]) * 60 + Number(m[4]) : start + 30;
+  if (!(end > start)) end = start + 30;
+  return { start, end: Math.min(end, 24 * 60), title: m[5].trim() || '(タスク)' };
+}
+const untimed = (list) => (list || []).filter((t) => !parseTaskTime(t.text));
+
+/** 時刻付きタスクを、スケジュールに並べる予定の形にする */
+function taskEvents() {
+  const out = [];
+  for (const [date, list] of Object.entries(state.tasks)) {
+    for (const t of list) {
+      const p = parseTaskTime(t.text);
+      if (!p) continue;
+      const base = parseYmd(date);
+      const s = new Date(base); s.setMinutes(p.start);
+      const e = new Date(base); e.setMinutes(p.end);
+      out.push({ id: 'task:' + t.id, task: t, taskDate: date, title: '☐ ' + p.title, allDay: false,
+        start: s.toISOString(), end: e.toISOString(), color: TASK_COLOR });
+    }
+  }
+  return out;
+}
 
 const state = {
   view: 'week',
@@ -70,7 +105,7 @@ function styleEvent(node, ev) {
 function eventsOn(day) {
   const dayStart = startOfDay(day); const dayEnd = addDays(dayStart, 1); const key = ymd(day);
   const allDay = []; const timed = [];
-  for (const ev of state.events) {
+  for (const ev of [...state.events, ...taskEvents()]) {
     if (ev.allDay) { if (ev.start <= key && key < ev.end) allDay.push(ev); continue; }
     const s = new Date(ev.start); const e = new Date(ev.end);
     if (e <= dayStart || s >= dayEnd) continue;
@@ -161,8 +196,11 @@ function renderWeek(root) {
       const name = el('div', 'name', it.ev.title);
       e.dataset.mins = String(bottom - top);
       e.append(name);
-      e.title = `${hm(new Date(it.ev.start))}–${hm(new Date(it.ev.end))} ${it.ev.title}${it.ev.calendarName ? `（${it.ev.calendarName}）` : ''}`;
-      e.addEventListener('click', (ev) => { ev.stopPropagation(); openEventDialog(it.ev); });
+      e.title = `${hm(new Date(it.ev.start))}–${hm(new Date(it.ev.end))} ${it.ev.title}${it.ev.calendarName ? `（${it.ev.calendarName}）` : ''}${it.ev.task ? '（クリックで完了・編集）' : ''}`;
+      e.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (it.ev.task) openTaskDialog(it.ev.taskDate, it.ev.task); else openEventDialog(it.ev);
+      });
       col.append(e);
     }
     if (sameDay(d, today)) {
@@ -218,7 +256,7 @@ function fitTimeline(scroll) {
 
 function renderTasks(cell, focusEmpty = false) {
   const date = cell.dataset.date;
-  const tasks = (state.tasks[date] || []).slice(0, TASKS_PER_DAY);
+  const tasks = untimed(state.tasks[date]).slice(0, TASKS_PER_DAY);
   cell.replaceChildren();
   let firstEmpty = null;
   for (let i = 0; i < TASKS_PER_DAY; i++) {
@@ -240,6 +278,7 @@ function renderTasks(cell, focusEmpty = false) {
       });
     } else {
       input.placeholder = '+';
+      input.title = 'タスクを追加（「15:00 〇〇」のように時刻を付けるとスケジュールに表示）';
       firstEmpty ||= input;
       let committed = false;
       const commit = async (refocus) => {
@@ -248,14 +287,17 @@ function renderTasks(cell, focusEmpty = false) {
         committed = true;
         const temp = { id: 'tmp-' + Date.now(), text: v };
         (state.tasks[date] ||= []).push(temp);
-        renderTasks(cell, refocus);
+        // 時刻付き（「15:00 〇〇」）はスケジュールに出るので画面全体を描き直す
+        const timed = !!parseTaskTime(v);
+        const redraw = (focus) => (timed ? render() : renderTasks(cell, focus));
+        redraw(refocus);
         try {
           const id = await call(api.addTask(date, v), 'タスクを追加できませんでした');
           temp.id = id;
-          renderTasks(cell);
+          redraw(false);
         } catch {
           state.tasks[date] = state.tasks[date].filter((x) => x !== temp);
-          renderTasks(cell);
+          redraw(false);
         }
       };
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commit(true); } });
@@ -290,10 +332,12 @@ function renderMonth(root) {
     const { allDay, timed } = eventsOn(d);
     const items = [...allDay.map((ev) => ({ ev, label: ev.title, cls: 'allday' })), ...timed.map(({ ev }) => ({ ev, label: ev.title, cls: '' }))];
     for (const it of items.slice(0, maxItems)) {
-      const m = el('div', `mitem ${it.cls}`, it.label); styleEvent(m, it.ev); m.title = it.label; cell.append(m);
+      const m = el('div', `mitem ${it.cls}`, it.label); styleEvent(m, it.ev); m.title = it.label;
+      if (it.ev.task) m.addEventListener('click', (e) => { e.stopPropagation(); openTaskDialog(it.ev.taskDate, it.ev.task); });
+      cell.append(m);
     }
     if (items.length > maxItems) cell.append(el('div', 'mmore', `他${items.length - maxItems}件`));
-    const n = (state.tasks[ymd(d)] || []).length;
+    const n = untimed(state.tasks[ymd(d)]).length;
     if (n) cell.append(el('div', 'mtasks', `☐ タスク${n}`));
     cell.addEventListener('click', () => { state.anchor = d; setView('week'); });
     grid.append(cell);

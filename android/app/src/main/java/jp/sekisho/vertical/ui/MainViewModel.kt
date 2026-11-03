@@ -188,7 +188,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---- タスク ----
     fun tasks(date: LocalDate): List<Task> = taskRepo.tasks(date)
     fun addTask(date: LocalDate, text: String) {
-        if (!taskRepo.add(date, text)) message = "タスクは1日${TaskRepository.PER_DAY}件までです"
+        if (!taskRepo.add(date, text)) {
+            message = "タスクリストは1日${TaskRepository.PER_DAY}件までです（「15:00 〇〇」のように時刻を付けるとスケジュールに表示されます）"
+        }
     }
     fun updateTask(date: LocalDate, id: String, text: String) = taskRepo.update(date, id, text)
     fun completeTask(date: LocalDate, id: String) = taskRepo.complete(date, id)

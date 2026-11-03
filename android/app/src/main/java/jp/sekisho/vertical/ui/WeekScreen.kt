@@ -63,6 +63,8 @@ import jp.sekisho.vertical.data.Task
 import jp.sekisho.vertical.data.TaskRepository
 import jp.sekisho.vertical.data.TimedSlot
 import jp.sekisho.vertical.data.eventsForDay
+import jp.sekisho.vertical.data.taskEvents
+import jp.sekisho.vertical.data.untimedTasks
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
@@ -86,7 +88,21 @@ fun WeekScreen(
     modifier: Modifier = Modifier,
 ) {
     val days = remember(weekStart) { (0L..6L).map { weekStart.plusDays(it) } }
-    val dayEvents = remember(events, weekStart) { days.associateWith { eventsForDay(events, it) } }
+    // 予定に、時刻付きタスク（「15:00 〇〇」）を加えてスケジュールに並べる
+    val dayEvents = remember(events, weekStart, taskVersion) {
+        val all = events + days.flatMap { taskEvents(it, tasksOf(it)) }
+        days.associateWith { eventsForDay(all, it) }
+    }
+    // スケジュール上のタスクをタップ → タスクの編集（完了）、予定をタップ → 予定の編集
+    val onItemClick: (CalEvent) -> Unit = { ev ->
+        val id = ev.taskId
+        val d = ev.taskDate
+        if (id != null && d != null) {
+            tasksOf(d).firstOrNull { it.id == id }?.let { onEditTask(d, it) }
+        } else {
+            onEventClick(ev)
+        }
+    }
     val today = LocalDate.now()
 
     BoxWithConstraints(modifier.fillMaxSize().padding(4.dp)) {
@@ -126,7 +142,7 @@ fun WeekScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth()
-                                .eventStyle(ev.color).clickable { onEventClick(ev) }
+                                .eventStyle(ev.color).clickable { onItemClick(ev) }
                                 .padding(horizontal = 5.dp, vertical = 1.dp),
                         )
                     }
@@ -148,7 +164,7 @@ fun WeekScreen(
                             slots = dayEvents.getValue(d).timed,
                             hourH = hourH,
                             nowMin = if (d == today) now.hour * 60 + now.minute else null,
-                            onEventClick = onEventClick,
+                            onEventClick = onItemClick,
                             onAddEvent = onAddEvent,
                             modifier = Modifier.weight(1f),
                         )
@@ -162,7 +178,7 @@ fun WeekScreen(
                         key(d, taskVersion) {
                             TaskCell(
                                 date = d,
-                                tasks = tasksOf(d),
+                                tasks = untimedTasks(tasksOf(d)),
                                 onAdd = { onAddTask(d, it) },
                                 onComplete = { onCompleteTask(d, it) },
                                 onEdit = { onEditTask(d, it) },

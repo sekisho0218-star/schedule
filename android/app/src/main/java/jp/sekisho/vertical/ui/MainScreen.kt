@@ -154,7 +154,7 @@ fun MainScreen(vm: MainViewModel) {
                         anchor = vm.anchor,
                         events = vm.events,
                         taskVersion = taskVersion,
-                        taskCount = { vm.tasks(it).size },
+                        tasksOf = vm::tasks,
                         onDayClick = vm::openWeekOf,
                     )
                 }

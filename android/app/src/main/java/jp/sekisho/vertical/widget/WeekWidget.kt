@@ -47,6 +47,8 @@ import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
 import jp.sekisho.vertical.data.TaskRepository
 import jp.sekisho.vertical.data.eventsForDay
+import jp.sekisho.vertical.data.taskEvents
+import jp.sekisho.vertical.data.untimedTasks
 import jp.sekisho.vertical.ui.Palette
 import java.time.LocalDate
 import java.time.LocalTime
@@ -80,11 +82,14 @@ private fun WidgetContent(version: Long) {
     val calendarRepo = remember { CalendarRepository(context) }
     val taskRepo = remember { TaskRepository(context) }
     val hasPermission = calendarRepo.hasReadPermission()
+    val allTasks = remember(version, weekStart) { days.associateWith { taskRepo.tasks(it) } }
+    // 時刻付きタスク（「15:00 〇〇」）はスケジュールに、時刻のないタスクはタスク欄に
     val dayEvents = remember(version, weekStart) {
-        val ev = calendarRepo.instances(weekStart, weekStart.plusDays(7))
+        val ev = calendarRepo.instances(weekStart, weekStart.plusDays(7)) +
+            days.flatMap { taskEvents(it, allTasks.getValue(it)) }
         days.associateWith { eventsForDay(ev, it) }
     }
-    val tasks = remember(version, weekStart) { days.associateWith { taskRepo.tasks(it) } }
+    val tasks = allTasks.mapValues { untimedTasks(it.value) }
 
     // 広い画面（Galaxy Z Fold の内側画面など）では文字と行を大きくする
     val ts = WeekBitmapRenderer.textScale(size.width.value)

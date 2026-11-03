@@ -30,7 +30,9 @@ class TaskRepository(context: Context) {
 
     fun add(date: LocalDate, text: String): Boolean {
         val list = tasks(date)
-        if (list.size >= PER_DAY || text.isBlank()) return false
+        if (text.isBlank()) return false
+        // タスクリスト（時刻なし）は1日 PER_DAY 件まで。時刻付きはスケジュールに出るので何件でも
+        if (!TaskTime.isTimed(text) && untimedTasks(list).size >= PER_DAY) return false
         val title = text.trim()
         if (!googleMode) {
             write(local, date, list + Task(UUID.randomUUID().toString(), title))
@@ -159,7 +161,8 @@ class TaskRepository(context: Context) {
     private fun notifyChanged() = WidgetUpdater.refresh(appContext)
 
     companion object {
-        const val PER_DAY = 5
+        /** タスクリストに表示する件数（時刻のないタスク） */
+        const val PER_DAY = 3
         private const val TEMP = "tmp-"
         const val NEED_LOGIN = "Google ToDo リストに接続できません。設定（⚙）から再接続してください"
     }
