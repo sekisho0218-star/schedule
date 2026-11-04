@@ -196,6 +196,8 @@ object ShiftParser {
     /* ---------------- 読み取りルール ---------------- */
 
     private val GRADE_RE = Regex("^(小|中|高)\\s*([1-6１-６])(.*)$", RegexOption.DOT_MATCHES_ALL)
+    /** 名前のない書き込みのうち、授業として扱うもの（「指定校コース」など）。それ以外（「ダスキン見積もり」など）は授業以外 */
+    val COURSE_RE = Regex("コース|講座|特訓|授業|補習")
     private val TIME_RE = Regex("(\\d{1,2})[:：](\\d{2})")
     private val PAREN_RE = Regex("[（(][^）)]*[）)]")
     private val SUBJECTS = mapOf(
@@ -345,12 +347,18 @@ object ShiftParser {
                         others += Other(date, 0, 0, title, true)
                         continue
                     }
+                    val freeOnly = slot.students.isEmpty() && slot.group == null
                     // 開始時刻：「10:00(小) 10:30(中)」のような枠は小学生かどうかで選ぶ
                     val times = TIME_RE.findAll(toHalf(label)).map { it.groupValues[1].toInt() * 60 + it.groupValues[2].toInt() }.toList()
                     var start = slot.override ?: (if (times.size > 1 && label.contains("中") && !elem) times[1] else times.firstOrNull())
                     if (start == null) { notes += "$date $title"; continue }
                     if (start % 30 == 5) start -= 5 // 16:05 → 16:00
                     if (weekday && elem && start == 16 * 60 && slot.override == null) start = 16 * 60 + 30
+                    // 授業ではない書き込み（「ダスキン見積もり」など）は、確認してから反映する「授業以外」
+                    if (freeOnly && !COURSE_RE.containsMatchIn(title)) {
+                        others += Other(date, start, minOf(start + 60, 24 * 60), title, false)
+                        continue
+                    }
                     lessons += Lesson(date, start, minOf(start + if (elem) 60 else 90, 24 * 60), title)
                 }
             }

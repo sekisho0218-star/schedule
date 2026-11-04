@@ -9,6 +9,8 @@ import jp.sekisho.vertical.data.EventDraft
 import jp.sekisho.vertical.data.Prefs
 import jp.sekisho.vertical.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,6 +29,9 @@ class ShiftSync(context: Context) {
     companion object {
         /** シフト表から追加した予定のメモ（一括削除はこの印の付いた予定だけが対象） */
         const val MARK_ADDED = "シフト表から自動登録（バーチカル手帳）"
+
+        /** 照合は同時に1つだけ（定期の照合と「今すぐ照合」が重なって二重に追加しないように） */
+        private val lock = Mutex()
     }
 
     private val app = context.applicationContext
@@ -60,7 +65,9 @@ class ShiftSync(context: Context) {
 
     /* ---------------- 照合して反映 ---------------- */
 
-    suspend fun run(): RunResult = withContext(Dispatchers.IO) {
+    suspend fun run(): RunResult = lock.withLock { withContext(Dispatchers.IO) { runLocked() } }
+
+    private fun runLocked(): RunResult {
         if (prefs.shiftUrl.isBlank()) throw IOException("設定でシフト表の URL を入力してください")
         if (!cal.hasWritePermission()) throw IOException("カレンダーへのアクセスを許可してください")
         val diff = compare()
@@ -87,14 +94,14 @@ class ShiftSync(context: Context) {
             DataSignals.bump()
             WidgetUpdater.refresh(app)
         }
-        RunResult(applied, failed, pending)
+        return RunResult(applied, failed, pending)
     }
 
     /** 確認待ちの内容 */
     fun pending(): Pending = fromJson(prefs.shiftPending)
 
     /** 確認画面の結果を反映。チェックしなかった項目は次回から聞かない */
-    suspend fun applyChoices(applyLessons: Boolean, keys: Set<String>): Pair<List<String>, List<String>> = withContext(Dispatchers.IO) {
+    suspend fun applyChoices(applyLessons: Boolean, keys: Set<String>): Pair<List<String>, List<String>> = lock.withLock { withContext(Dispatchers.IO) {
         val p = pending()
         prefs.shiftPending = ""
         val applied = mutableListOf<String>()
@@ -111,7 +118,7 @@ class ShiftSync(context: Context) {
         DataSignals.bump()
         WidgetUpdater.refresh(app)
         applied to failed
-    }
+    } }
 
     private fun apply(op: Op): Boolean {
         val draft = EventDraft(
@@ -140,8 +147,13 @@ class ShiftSync(context: Context) {
     private data class Diff(val lessons: List<Op>, val proposals: List<Proposal>, val notes: List<String>)
 
     private val lessonTitle = Regex("^(小|中|高)\\s*[1-6１-６]")
+    /**
+     * カレンダーの予定が「授業」か。シフト表の読み取り（ShiftParser）と同じ基準で、予定名だけで決める
+     * （以前はここと読み取りの基準が違い、「ダスキン見積もり」が毎回追加されて重複していた）
+     */
     private fun isLesson(ev: CalEvent) = !ev.allDay &&
-        ((lessonTitle.containsMatchIn(ev.title) && !ev.title.contains("様")) || ev.title.contains("指定校"))
+        ((lessonTitle.containsMatchIn(ev.title) && !ev.title.contains("様")) || ShiftParser.COURSE_RE.containsMatchIn(ev.title))
+    private fun addedBySync(ev: CalEvent) = ev.description.contains(MARK_ADDED)
 
     private fun localDate(ev: CalEvent): LocalDate =
         if (ev.allDay) Dates.utcDate(ev.begin) else Instant.ofEpochMilli(ev.begin).atZone(Dates.zone).toLocalDate()
@@ -166,6 +178,9 @@ class ShiftSync(context: Context) {
     }
 
     /** シフト表で科目が空欄の生徒は、カレンダーの予定の科目を引き継ぐ */
+    /** 重複判定用の名前（生徒の並び順・科目・空白の違いは無視） */
+    private fun lessonKey(title: String) = students(title).map { it.base }.sorted().joinToString("/")
+
     private fun mergeTitle(want: String, have: String): String {
         val h = students(have)
         return students(want).joinToString("/") { s ->
@@ -187,10 +202,28 @@ class ShiftSync(context: Context) {
             ?: cal.defaultCalendar(prefs.defaultCalendarId)?.id
             ?: throw IOException("書き込めるカレンダーがありません")
         val writable = calendars.filter { it.writable }.map { it.id }.toSet()
-        val events = cal.instances(today, last.plusDays(1)).filter { val d = localDate(it); !d.isBefore(today) && !d.isAfter(last) }
+        var events = cal.instances(today, last.plusDays(1)).filter { val d = localDate(it); !d.isBefore(today) && !d.isAfter(last) }
+        val ops = mutableListOf<Op>()
+
+        /* ---- 重複の掃除：照合で追加した予定が同じ日・同じ時間・同じ名前で重なっていたら、1件だけ残して削除 ---- */
+        val dupIds = HashSet<Pair<Long, Long>>()
+        events.filter { it.calendarId == calId && it.calendarId in writable }
+            .groupBy { Triple(it.begin, it.end, lessonKey(it.title)) }
+            .values.filter { it.size > 1 }
+            .forEach { g ->
+                // 自分で入れた予定（印なし）があればそれを残す。なければ1件目を残す
+                val keep = g.firstOrNull { !addedBySync(it) } ?: g.first()
+                for (e in g) {
+                    if (e === keep || !addedBySync(e)) continue
+                    dupIds += e.eventId to e.begin
+                    val date = localDate(e)
+                    val whenText = if (e.allDay) "終日" else "${hm(minOfDay(e.begin))}–${hm(minOfDay(e.end))}"
+                    ops += Op("delete", "${dayLabel(date)} $whenText ${e.title}（重複を削除）", e.calendarId, date, 0, 0, e.title, e.allDay, e.eventId, e.begin, e.series)
+                }
+            }
+        events = events.filter { (it.eventId to it.begin) !in dupIds }
 
         /* ---- 授業 ---- */
-        val ops = mutableListOf<Op>()
         val dates = (lessons.map { it.date } + events.filter { !it.allDay }.map { localDate(it) }).toSortedSet()
         for (date in dates) {
             val want = lessons.filter { it.date == date }
@@ -225,7 +258,12 @@ class ShiftSync(context: Context) {
                     calId, date, w.start, w.end, title, false, h.eventId, h.begin, h.series, h.description)
             }
             rest.forEachIndexed { wi, w ->
-                if (wi !in usedW) ops += Op("add", "${dayLabel(date)} ${hm(w.start)}–${hm(w.end)} ${w.title}", calId, date, w.start, w.end, w.title, false)
+                if (wi in usedW) return@forEachIndexed
+                // どのカレンダーにでも、同じ日・同じ時間・同じ授業の予定がすでにあれば追加しない（重複防止）
+                val already = events.any {
+                    !it.allDay && localDate(it) == date && minOfDay(it.begin) == w.start && minOfDay(it.end) == w.end && sameLesson(it.title, w.title)
+                }
+                if (!already) ops += Op("add", "${dayLabel(date)} ${hm(w.start)}–${hm(w.end)} ${w.title}", calId, date, w.start, w.end, w.title, false)
             }
             have.forEachIndexed { hi, h ->
                 if (hi !in usedH) ops += Op("delete", "${dayLabel(date)} ${hm(minOfDay(h.begin))}–${hm(minOfDay(h.end))} ${h.title}",

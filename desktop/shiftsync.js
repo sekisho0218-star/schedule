@@ -1,7 +1,7 @@
 // シフト表と Google カレンダーの照合・反映
 //  - 授業：自動で追加・変更・削除（初回だけは確認してから）
 //  - 授業以外（「中3竹内様」など）と、シフト表にない予定：確認して反映
-const { loadShift } = require('./shift');
+const { loadShift, COURSE_RE } = require('./shift');
 const google = require('./google');
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -35,12 +35,16 @@ function mergeTitle(want, have) {
 const lessonKey = (t) => students(t).map((x) => x.base).sort().join('/');
 
 const LESSON_TITLE = /^(小|中|高)\s*[1-6１-６]/;
+const MARK_ADDED = 'シフト表から自動登録';
+/**
+ * カレンダーの予定が「授業」か。シフト表の読み取り（shift.js）と同じ基準で、予定名だけで決める
+ * （以前はここと読み取りの基準が違い、「ダスキン見積もり」が毎回追加されて重複していた）
+ */
 function isLessonEvent(ev) {
   if (ev.allDay) return false;
-  if (ev.shift === 'lesson') return true;
-  if (ev.shift === 'other') return false;
-  return (LESSON_TITLE.test(ev.title) && !/様/.test(ev.title)) || /指定校/.test(ev.title);
+  return (LESSON_TITLE.test(ev.title) && !/様/.test(ev.title)) || COURSE_RE.test(ev.title);
 }
+const addedBySync = (ev) => (ev.description || '').includes(MARK_ADDED);
 
 function toEvent(item) {
   if (item.allDay) {
@@ -61,7 +65,7 @@ async function compare(settings, today = new Date()) {
 
   const last = new Date(Math.max(...[...lessons, ...others].map((x) => x.date.getTime())));
   const to = new Date(last); to.setDate(to.getDate() + 1); to.setHours(0, 0, 0, 0);
-  const events = await google.listEvents(from.toISOString(), to.toISOString());
+  let events = await google.listEvents(from.toISOString(), to.toISOString());
 
   // 反映先カレンダー（'primary' はメインのカレンダー）
   const calId = settings.calendarId && settings.calendarId !== 'primary'
@@ -69,8 +73,31 @@ async function compare(settings, today = new Date()) {
     : (events.find((e) => e.primary)?.calendarId || 'primary');
   const onDate = (ev, date) => (ev.allDay ? ev.start === ymd(date) : ymd(new Date(ev.start)) === ymd(date));
 
-  /* ---- 授業 ---- */
+  /* ---- 重複の掃除：照合で追加した予定が同じ日・同じ時間・同じ名前で重なっていたら、1件だけ残して削除 ---- */
   const lessonOps = [];
+  const groups = new Map();
+  for (const e of events) {
+    if (e.calendarId !== calId || !e.writable) continue;
+    const k = `${e.allDay ? e.start : new Date(e.start).getTime()}|${e.allDay ? e.end : new Date(e.end).getTime()}|${lessonKey(e.title)}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(e);
+  }
+  const dupIds = new Set();
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    // 自分で入れた予定（印なし）があればそれを残す。なければ1件目を残す
+    const keep = g.find((e) => !addedBySync(e)) || g[0];
+    for (const e of g) {
+      if (e === keep || !addedBySync(e)) continue;
+      dupIds.add(e.eventId);
+      const date = e.allDay ? new Date(e.start + 'T00:00:00') : new Date(e.start);
+      const when = e.allDay ? '終日' : `${hm(minOfDay(e.start))}–${hm(minOfDay(e.end))}`;
+      lessonOps.push({ op: 'delete', calendarId: e.calendarId, eventId: e.eventId, desc: `${dayLabel(date)} ${when} ${e.title}（重複を削除）` });
+    }
+  }
+  events = events.filter((e) => !dupIds.has(e.eventId));
+
+  /* ---- 授業 ---- */
   const dates = [...new Set([...lessons.map((l) => ymd(l.date)), ...events.filter((e) => !e.allDay).map((e) => ymd(new Date(e.start)))])];
   for (const key of dates) {
     const date = new Date(key + 'T00:00:00');
@@ -102,7 +129,10 @@ async function compare(settings, today = new Date()) {
         desc: `${dayLabel(date)} ${hm(minOfDay(h.start))}–${hm(minOfDay(h.end))} ${h.title} → ${hm(item.start)}–${hm(item.end)} ${item.title}` });
     }
     rest.forEach((w, wi) => {
-      if (!usedW.has(wi)) lessonOps.push({ op: 'add', calendarId: calId, item: w, desc: `${dayLabel(date)} ${hm(w.start)}–${hm(w.end)} ${w.title}` });
+      if (usedW.has(wi)) return;
+      // どのカレンダーにでも、同じ日・同じ時間・同じ授業の予定がすでにあれば追加しない（重複防止）
+      const already = events.some((e) => !e.allDay && onDate(e, date) && minOfDay(e.start) === w.start && minOfDay(e.end) === w.end && sameLesson(e.title, w.title));
+      if (!already) lessonOps.push({ op: 'add', calendarId: calId, item: w, desc: `${dayLabel(date)} ${hm(w.start)}–${hm(w.end)} ${w.title}` });
     });
     have = have.filter((_, hi) => !usedH.has(hi));
     for (const h of have) {

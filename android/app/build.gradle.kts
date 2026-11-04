@@ -12,8 +12,8 @@ android {
         applicationId = "jp.sekisho.vertical"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "2.5.0"
+        versionCode = 11
+        versionName = "2.5.1"
     }
 
     signingConfigs {

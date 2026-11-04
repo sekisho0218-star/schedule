@@ -79,6 +79,8 @@ function parseTable(html) {
 /* ---------------- 読み取りルール ---------------- */
 
 const GRADE_RE = /^(小|中|高)\s*([1-6１-６])(.*)$/s;
+/** 名前のない書き込みのうち、授業として扱うもの（「指定校コース」など）。それ以外（「ダスキン見積もり」など）は授業以外 */
+const COURSE_RE = /コース|講座|特訓|授業|補習/;
 const TIME_RE = /(\d{1,2})[:：](\d{2})/;
 const SUBJECTS = { 数学: '数', 算数: '算', 英語: '英', 理科: '理', 国語: '国', 社会: '社', 数: '数', 算: '算', 英: '英', 理: '理', 国: '国', 社: '社' };
 const toHalf = (s) => s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
@@ -232,12 +234,18 @@ function extractTeacher(grid, teacher, roster, today = new Date()) {
           continue;
         }
 
+        const freeOnly = !slot.students.length && !slot.group;
         // 開始時刻：「10:00(小) 10:30(中)」のような枠は小学生かどうかで選ぶ
         const times = [...toHalf(label).matchAll(/(\d{1,2})[:：](\d{2})/g)].map((m) => Number(m[1]) * 60 + Number(m[2]));
         let start = slot.override ?? (times.length > 1 && /中/.test(label) && !elem ? times[1] : times[0]);
         if (start == null) { notes.push({ date, text: title }); continue; }
         if (start % 30 === 5) start -= 5; // 16:05 → 16:00
         if (weekday && elem && start === 16 * 60 && slot.override == null) start = 16 * 60 + 30;
+        // 授業ではない書き込み（「ダスキン見積もり」など）は、確認してから反映する「授業以外」
+        if (freeOnly && !COURSE_RE.test(title)) {
+          others.push({ date, start, end: Math.min(start + 60, 24 * 60), title });
+          continue;
+        }
         lessons.push({ date, start, end: Math.min(start + (elem ? 60 : 90), 24 * 60), title });
       }
     }
@@ -260,4 +268,4 @@ async function loadShift({ url, teacher, tab = 'シフト表(NEW)', rosterTab = 
   return extractTeacher(grid, teacher, roster, today);
 }
 
-module.exports = { loadShift, extractTeacher, parseTable, readSlot, surname, subjectAbbr, sheetIdFrom };
+module.exports = { loadShift, extractTeacher, parseTable, readSlot, surname, subjectAbbr, sheetIdFrom, COURSE_RE };
