@@ -51,6 +51,15 @@ object ShiftParser {
         parseTable(fetch("https://docs.google.com/spreadsheets/d/$id/htmlview/sheet?headers=false&gid=$gid"))
 
     fun load(url: String, teacher: String, today: LocalDate, tab: String = "シフト表(NEW)", rosterTab: String = "名簿"): Result {
+        val sheet = fetchSheet(url, tab, rosterTab)
+        return extract(sheet.grid, teacher, sheet.roster, today)
+    }
+
+    /** シフト表の表（セルの2次元配列）と名簿（名前→学年） */
+    data class Sheet(val grid: List<List<String>>, val roster: Map<String, String>)
+
+    /** シフト表のタブと名簿をまとめて読み込む */
+    fun fetchSheet(url: String, tab: String = "シフト表(NEW)", rosterTab: String = "名簿"): Sheet {
         val id = sheetId(url)
         val tabs = listTabs(id)
         val gid = tabs[tab] ?: throw IOException("シフト表に「$tab」のタブが見つかりません")
@@ -62,7 +71,73 @@ object ShiftParser {
                 if (Regex("^(小|中|高)[1-6]$").matches(g) && n.isNotBlank()) roster[noSpace(n)] = g
             }
         }
-        return extract(fetchGrid(id, gid), teacher, roster, today)
+        return Sheet(fetchGrid(id, gid), roster)
+    }
+
+    /* ---------------- 1日分（全講師）の表示用 ---------------- */
+
+    /** 生徒1人（学年・名前・科目はシフト表の書き方のまま） */
+    data class StudentView(val grade: String?, val name: String, val subject: String?)
+
+    /** 1コマ分のマス */
+    data class CellView(
+        val students: List<StudentView>,
+        /** 集団授業（「中1」＋「数学」など） */
+        val group: String?,
+        /** そのほかの書き込み（「指定校コース」など） */
+        val texts: List<String>,
+        /** 授業以外（時刻と「中3竹内様」など） */
+        val guests: List<Pair<String?, String>>,
+    ) {
+        val isEmpty get() = students.isEmpty() && group == null && texts.isEmpty() && guests.isEmpty()
+    }
+
+    /** 時間帯1行（label はシフト表の時刻欄の書き方のまま。startMin は並べ替え・今の時間帯の判定用） */
+    data class RowView(val label: String, val startMin: Int?, val cells: Map<String, CellView>)
+
+    data class DayView(val date: LocalDate, val teachers: List<String>, val rows: List<RowView>)
+
+    /** 指定した日の全講師のシフト。シフト表にその日がなければ null */
+    fun day(grid0: List<List<String>>, roster: Map<String, String>, date: LocalDate): DayView? {
+        val w = grid0.maxOfOrNull { it.size } ?: 0
+        val g = grid0.map { it + List(w - it.size) { "" } }
+        val dateRe = Regex("^\\d{1,2}/\\d{1,2}$")
+        for (top in 0 until g.size - 1) {
+            if (!dateRe.matches(g[top].getOrElse(1) { "" })) continue
+            for (d in 0 until 7) {
+                val tc = 15 * d
+                if (tc + 15 > w) break
+                if (resolveDate(g[top][tc + 1], date) != date) continue
+                // 講師（1人あたり横2列）
+                val cols = (tc + 1 until tc + 15).filter { g[top + 1][it].isNotBlank() }
+                val teachers = cols.map { g[top + 1][it].trim() }
+                val rows = mutableListOf<RowView>()
+                for (off in 2..23 step 3) {
+                    val l = top + off
+                    if (l + 2 >= g.size) break
+                    val cells = LinkedHashMap<String, CellView>()
+                    cols.forEachIndexed { i, c ->
+                        val raw = (0..2).map { k -> listOf(g[l + k][c], g[l + k].getOrElse(c + 1) { "" }) }
+                        if (raw.flatten().all { it.isBlank() }) return@forEachIndexed
+                        val s = readSlot(raw, roster)
+                        cells[teachers[i]] = CellView(
+                            students = s.students.map { StudentView(it.grade, it.name, it.subjectText) },
+                            group = s.group?.let { grp ->
+                                // 「中1数学」→「中1 数学」
+                                Regex("^((小|中|高)[1-6])(.*)$").find(grp)?.let { "${it.groupValues[1]} ${it.groupValues[3]}" } ?: grp
+                            },
+                            texts = s.freeText.toList(),
+                            guests = s.others.map { (t, title) -> (t?.let { "${it / 60}:${(it % 60).toString().padStart(2, '0')}" }) to title },
+                        )
+                    }
+                    val label = g[l][tc].trim()
+                    if (cells.isEmpty() && label.isEmpty()) continue
+                    rows += RowView(label, minutes(label), cells)
+                }
+                return DayView(date, teachers, rows)
+            }
+        }
+        return null
     }
 
     /* ---------------- HTML の表 → 2次元配列（結合セルは左上だけに値） ---------------- */
@@ -157,7 +232,7 @@ object ShiftParser {
         }.minByOrNull { abs(ChronoUnit.DAYS.between(today, it)) }
     }
 
-    private data class Student(val grade: String?, val name: String, val subject: String?)
+    private data class Student(val grade: String?, val name: String, val subject: String?, val subjectText: String? = null)
     private class Slot {
         val students = mutableListOf<Student>()
         var group: String? = null
@@ -196,9 +271,10 @@ object ShiftParser {
             for (x in i - 1 downTo 0) if (k[x][j] == "grade") { grade = gradeOf(cells[x][j]); break }
             if (grade == null) grade = roster[noSpace(name)]
             var subject: String? = null
-            for (x in i + 1..2) if (k[x][j] == "subject") { subject = subjectAbbr(cells[x][j]); break }
-            if (subject == null && k[i][1 - j] == "subject") subject = subjectAbbr(cells[i][1 - j])
-            out.students += Student(grade, name, subject)
+            var subjectText: String? = null
+            for (x in i + 1..2) if (k[x][j] == "subject") { subject = subjectAbbr(cells[x][j]); subjectText = cells[x][j].trim(); break }
+            if (subject == null && k[i][1 - j] == "subject") { subject = subjectAbbr(cells[i][1 - j]); subjectText = cells[i][1 - j].trim() }
+            out.students += Student(grade, name, subject, subjectText)
         }
         // 集団授業（「中1」＋「数学」で名前なし）
         if (out.students.isEmpty()) {

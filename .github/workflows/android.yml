@@ -31,11 +31,14 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon testDebugUnitTest assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk vertical-techo.apk
+          cp todayshift/build/outputs/apk/debug/todayshift-debug.apk today-shift.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: vertical-techo-apk
-          path: android/vertical-techo.apk
+          path: |
+            android/vertical-techo.apk
+            android/today-shift.apk
           if-no-files-found: error
 
       # スマホから .apk を直接ダウンロードできるよう、Releases に最新版を置く
@@ -45,7 +48,11 @@ jobs:
           tag_name: latest-apk
           name: 最新APK（バーチカル手帳）
           body: |
-            スマホでこのページを開き、下の Assets にある `vertical-techo.apk` をタップしてダウンロード・インストールしてください。
+            スマホでこのページを開き、下の Assets からダウンロード・インストールしてください。
+            - `vertical-techo.apk`：バーチカル手帳
+            - `today-shift.apk`：今日のシフト（シフト表から1日分の全員のシフトを表示）
             ビルド元コミット: ${{ github.sha }}
           prerelease: true
-          files: android/vertical-techo.apk
+          files: |
+            android/vertical-techo.apk
+            android/today-shift.apk

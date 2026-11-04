@@ -46,3 +46,29 @@ class ShiftParserTest {
         assertEquals(null, ShiftParser.subjectAbbr("指定校コース"))
     }
 }
+
+class ShiftDayViewTest {
+    private fun resource(name: String) = javaClass.classLoader!!.getResource(name)!!.readText(Charsets.UTF_8)
+
+    @Test
+    fun dayOfAllTeachers() {
+        val grid = resource("shift_grid.tsv").trimEnd('\n').split('\n').map { line ->
+            line.split('\t').map { it.replace("\\n", "\n").replace("\\t", "\t").replace("\\\\", "\\") }
+        }
+        val roster = mapOf("小林八郎" to "高1", "吉田十郎" to "高2", "山口一子" to "高1")
+        val day = ShiftParser.day(grid, roster, java.time.LocalDate.of(2026, 11, 3))!!
+        assertEquals(listOf("赤松", "岸田"), day.teachers)
+        val row = day.rows.first { it.label == "16:05" }
+        val cell = row.cells.getValue("赤松")
+        assertEquals(listOf("渡辺　六子", "中村　七子"), cell.students.map { it.name })
+        assertEquals(listOf("小6", "小6"), cell.students.map { it.grade })
+        assertEquals(listOf("算数", "算数"), cell.students.map { it.subject })
+        // 学年なしの生徒は名簿の学年、科目はシフト表の書き方のまま（振替）
+        val late = day.rows.first { it.label == "20:35" }.cells.getValue("赤松")
+        assertEquals(listOf("高1" to "数学", "中3" to "数学(振替)"), late.students.map { it.grade to it.subject })
+        // 授業以外
+        val guest = day.rows.first { it.label == "10:30" }.cells.getValue("赤松")
+        assertEquals(listOf("11:00" to "中3田中様"), guest.guests)
+        assertEquals(null, ShiftParser.day(grid, roster, java.time.LocalDate.of(2026, 12, 25)))
+    }
+}

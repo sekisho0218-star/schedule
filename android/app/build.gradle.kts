@@ -75,5 +75,5 @@ dependencies {
     // ウィジェットの定期更新・カレンダー変更検知
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 
-    testImplementation("junit:junit:4.13.2")
+    implementation(project(":shiftcore"))
 }

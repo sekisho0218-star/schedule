@@ -1,0 +1,7 @@
+<resources>
+    <color name="bg">#F1EEE6</color>
+    <color name="ic_bg">#2F6F6A</color>
+    <style name="Theme.TodayShift" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+</resources>

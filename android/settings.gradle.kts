@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "VerticalTecho"
-include(":app")
+include(":app", ":shiftcore", ":todayshift")
