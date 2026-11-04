@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import kotlin.math.ceil
 import jp.sekisho.todayshift.Layout
 import jp.sekisho.vertical.shift.ShiftParser
 
@@ -34,27 +35,52 @@ object TableRenderer {
         val cv = Canvas(bmp)
         cv.drawColor(PAPER)
 
-        val timeDp = 30f
-        val (perTier, _) = Layout.tiers(day.teachers.size, widthDp - timeDp, minColDp = 72f)
-        val tiers = day.teachers.chunked(perTier).map { group ->
+        val nowRow = nowMin?.let { Layout.nowRow(day, it) }
+        val n = day.teachers.size.coerceAtLeast(1)
+
+        // 文字の幅を dp で測る（textSize を dp の値にして測る）
+        val measure = Paint(Paint.ANTI_ALIAS_FLAG)
+        fun widthAt(s: String, f: Float, bold: Boolean = false): Float {
+            measure.textSize = f
+            measure.typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            return measure.measureText(s)
+        }
+        fun timeColAt(f: Float) = widthAt("20:35", f) + 6f
+        fun tiersOf(per: Int) = day.teachers.chunked(per).map { group ->
             TierRows(group, day.rows.withIndex().filter { (_, r) -> group.any { r.cells[it]?.isEmpty == false } }.map { it.index to it.value })
         }
-        val nowRow = nowMin?.let { Layout.nowRow(day, it) }
-
-        // 文字の大きさ：基準（10dp）で全体の高さを見積もり、入りきらなければ縮める
-        fun heightAt(f: Float): Float {
+        fun heightAt(tiers: List<TierRows>, f: Float): Float {
             val lineH = f * 1.3f
             return tiers.sumOf { t ->
-                val head = f * 1.6f
                 val body = t.rows.sumOf { (_, r) ->
                     val lines = t.teachers.maxOf { r.cells[it]?.let { c -> Layout.shortLines(c).size } ?: 0 }.coerceAtLeast(1)
                     (lines * lineH + f * 0.5f).toDouble()
                 }
-                (head + body + f * 0.6f).toDouble()
+                (f * 1.6f + body + f * 0.6f).toDouble()
             }.toFloat()
         }
-        var f = 10.5f
-        while (f > 6f && heightAt(f) > heightDp) f -= 0.25f
+        /** 文字の大きさ f で、高さにも幅にも収まるか */
+        fun fits(tiers: List<TierRows>, per: Int, f: Float): Boolean {
+            if (heightAt(tiers, f) > heightDp) return false
+            val colW = (widthDp - timeColAt(f)) / per - 5f
+            if (colW <= 0) return false
+            return tiers.all { t ->
+                t.teachers.all { name -> widthAt(name, f, bold = true) <= colW } &&
+                    t.rows.all { (_, r) -> t.teachers.all { name -> r.cells[name]?.let { c -> Layout.shortLines(c).all { widthAt(it, f) <= colW } } ?: true } }
+            }
+        }
+        // 1段・2段・3段…のうち、いちばん大きな文字で収まる並べ方を選ぶ（縦に伸ばすと段を増やして文字を大きくできることがある）
+        var best = Triple(n, tiersOf(n), 6f)
+        for (tierCount in 1..n) {
+            val per = ceil(n / tierCount.toDouble()).toInt()
+            if (tierCount > 1 && ceil(n / (tierCount - 1).toDouble()).toInt() == per) continue
+            val tiers = tiersOf(per)
+            var f = 28f
+            while (f > 6f && !fits(tiers, per, f)) f -= 0.25f
+            if (f > best.third || (f == best.third && per > best.first)) best = Triple(per, tiers, f)
+        }
+        val (perTier, tiers, f) = best
+        val timeDp = timeColAt(f)
         fun dp(v: Float) = v * scale
 
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(f); color = INK }
