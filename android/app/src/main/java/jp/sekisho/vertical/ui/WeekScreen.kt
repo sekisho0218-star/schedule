@@ -43,7 +43,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -178,16 +178,15 @@ fun WeekScreen(
                         Text("TASK", fontSize = ssp(9f), color = c(Palette.SUB))
                     }
                     days.forEach { d ->
-                        key(d, taskVersion) {
-                            TaskCell(
-                                date = d,
-                                tasks = linked.getValue(d).second,
-                                onAdd = { onAddTask(d, it) },
-                                onComplete = { onCompleteTask(d, it) },
-                                onEdit = { onEditTask(d, it) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                        // 同期のたびに入力欄を作り直さない（作り直すと入力途中の文字が追加されることがあった）
+                        TaskCell(
+                            date = d,
+                            tasks = linked.getValue(d).second,
+                            onAdd = { onAddTask(d, it) },
+                            onComplete = { onCompleteTask(d, it) },
+                            onEdit = { onEditTask(d, it) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
             }
@@ -377,20 +376,22 @@ private fun TaskRow(task: Task, modifier: Modifier, onComplete: () -> Unit, onEd
 @Composable
 private fun EmptyTaskRow(modifier: Modifier, onAdd: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
-    val commit = {
-        if (text.isNotBlank()) {
-            onAdd(text.trim())
-            text = ""
-        }
-    }
+    val focusManager = LocalFocusManager.current
     BasicTextField(
         value = text,
         onValueChange = { text = it },
         singleLine = true,
         textStyle = TextStyle(fontSize = ssp(11f), color = c(Palette.INK)),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { commit() }),
-        modifier = modifier.onFocusChanged { if (!it.isFocused) commit() },
+        // 追加は確定（Enter）を押したときだけ。欄から離れただけでは追加しない
+        // （日本語入力では欄を空にした直後に入力中の文字が送り直されることがあり、二重に追加される原因になっていた）
+        keyboardActions = KeyboardActions(onDone = {
+            val v = text.trim()
+            text = ""
+            focusManager.clearFocus() // 入力を確定させてキーボードを閉じる
+            if (v.isNotEmpty()) onAdd(v)
+        }),
+        modifier = modifier,
         decorationBox = { inner ->
             Box(Modifier.fillMaxSize().padding(start = 2.dp), contentAlignment = Alignment.CenterStart) {
                 if (text.isEmpty()) Text("+", fontSize = ssp(15f), color = c(0xFF9D9686.toInt()))

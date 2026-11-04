@@ -38,6 +38,13 @@ class TaskRepository(context: Context) {
             write(local, date, list + Task(UUID.randomUUID().toString(), title))
             return true
         }
+        // 同じ日・同じ内容の追加が短い間に続いたら、2回目以降は無視（二重登録の防止）
+        val key = "$date|$title"
+        val now = System.currentTimeMillis()
+        synchronized(recentAdds) {
+            if ((recentAdds[key] ?: 0L) > now - 10_000) return true
+            recentAdds[key] = now
+        }
         val tempId = TEMP + UUID.randomUUID()
         write(cache, date, list + Task(tempId, title))
         remote("タスクを追加できませんでした") { api ->
@@ -90,13 +97,33 @@ class TaskRepository(context: Context) {
             // 位置の値が大きいほど先に作られたタスク（Google は新しいタスクを先頭に追加する）
             val fetched = byDate[d].orEmpty().sortedByDescending { it.position }.map { Task(it.id, it.title) }
             val pending = read(cache, d).filter { it.id.startsWith(TEMP) }
-            val list = fetched + pending
+            val list = (fetched + pending).distinctBy { it.id }
             if (list.isEmpty()) editor.remove(d.toString()) else editor.putString(d.toString(), toJson(list))
             d = d.plusDays(1)
         }
         editor.commit()
         notifyChanged()
         return true
+    }
+
+    /**
+     * Google ToDo リストの重複を整理：同じ日に同じ名前の未完了タスクが複数あれば、1件を残して削除する。
+     * @return 削除した件数
+     */
+    suspend fun removeDuplicates(from: LocalDate, toExclusive: LocalDate): Result<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val token = GoogleAuth.silentToken(appContext) ?: throw IllegalStateException(NEED_LOGIN)
+            val api = GoogleTasksApi(token)
+            var removed = 0
+            api.list(from, toExclusive)
+                .groupBy { it.due to it.title.replace(Regex("[\\s\u3000]"), "") }
+                .values.filter { it.size > 1 }
+                .forEach { g ->
+                    // 先に作られたもの（位置の値が大きい）を残す
+                    g.sortedByDescending { it.position }.drop(1).forEach { api.delete(it.id); removed++ }
+                }
+            removed
+        }.also { refresh(from, toExclusive) }
     }
 
     /** Google 同期を始める：端末内のタスクを Google に移してから切り替える */
@@ -163,6 +190,9 @@ class TaskRepository(context: Context) {
     companion object {
         /** タスクリストに表示する件数（時刻のないタスク） */
         const val PER_DAY = 3
+
+        /** 直近に追加したタスク（日付|内容 → 時刻）。二重登録の防止用 */
+        private val recentAdds = HashMap<String, Long>()
         private const val TEMP = "tmp-"
         const val NEED_LOGIN = "Google ToDo リストに接続できません。設定（⚙）から再接続してください"
     }

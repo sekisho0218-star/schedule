@@ -215,6 +215,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         message = "「反映しない」にした項目を、次回の照合でもう一度確認します"
     }
 
+    /** Google ToDo リストの重複したタスクを整理（30日前〜120日後） */
+    fun removeDuplicateTasks() {
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            taskRepo.removeDuplicates(today.minusDays(30), today.plusDays(120))
+                .onSuccess { n -> message = if (n > 0) "重複していたタスクを${n}件削除しました" else "重複しているタスクはありません" }
+                .onFailure { message = "タスクを整理できませんでした：${it.message ?: it.javaClass.simpleName}" }
+        }
+    }
+
     fun disconnectTasks() {
         taskRepo.disableGoogle()
         tasksGoogle = false

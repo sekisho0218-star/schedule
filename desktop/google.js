@@ -247,8 +247,9 @@ async function listTasks(fromYmd, toYmdExclusive) {
 
   const byDate = {};
   // 位置の値が大きいほど先に作られたタスク（Google は新しいタスクを先頭に追加する）
+  const seen = new Set();
   items
-    .filter((t) => t.due && t.status !== 'completed' && !t.deleted)
+    .filter((t) => t.due && t.status !== 'completed' && !t.deleted && !seen.has(t.id) && seen.add(t.id))
     .sort((a, b) => (a.position < b.position ? 1 : -1))
     .forEach((t) => {
       const d = t.due.slice(0, 10);

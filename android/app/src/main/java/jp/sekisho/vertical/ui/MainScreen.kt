@@ -192,6 +192,7 @@ fun MainScreen(vm: MainViewModel) {
             tasksConnecting = vm.tasksConnecting,
             onConnectTasks = connectTasks,
             onDisconnectTasks = vm::disconnectTasks,
+            onRemoveDuplicateTasks = { showSettings = false; vm.removeDuplicateTasks() },
             shift = ShiftSettingsUi(
                 enabled = vm.shiftEnabled,
                 url = vm.shiftUrl,

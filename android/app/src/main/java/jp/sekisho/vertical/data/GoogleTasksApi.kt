@@ -56,6 +56,10 @@ class GoogleTasksApi(private val token: String) {
         call("PATCH", "$base/${enc(id)}", JSONObject().put("title", title))
     }
 
+    fun delete(id: String) {
+        call("DELETE", "$base/${enc(id)}", null)
+    }
+
     fun complete(id: String) {
         call("PATCH", "$base/${enc(id)}", JSONObject().put("status", "completed"))
     }

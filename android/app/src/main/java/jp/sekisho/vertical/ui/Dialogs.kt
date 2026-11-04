@@ -256,6 +256,7 @@ fun SettingsDialog(
     tasksConnecting: Boolean,
     onConnectTasks: () -> Unit,
     onDisconnectTasks: () -> Unit,
+    onRemoveDuplicateTasks: () -> Unit,
     shift: ShiftSettingsUi,
     onDismiss: () -> Unit,
 ) {
@@ -301,6 +302,8 @@ fun SettingsDialog(
                     if (tasksConnecting) {
                         Text("接続中…", fontSize = 13.sp)
                     } else if (tasksGoogle) {
+                        OutlinedButton(onClick = onRemoveDuplicateTasks) { Text("重複したタスクを整理") }
+                        Spacer(Modifier.width(8.dp))
                         OutlinedButton(onClick = onDisconnectTasks) { Text("同期を解除") }
                     } else {
                         OutlinedButton(onClick = onConnectTasks) { Text("Google ToDo リストと同期") }

@@ -279,6 +279,8 @@ function fitTimeline(scroll) {
   });
 }
 
+const recentAdds = new Map(); // 日付|内容 → 追加した時刻
+
 function renderTasks(cell, focusEmpty = false) {
   const date = cell.dataset.date;
   const tasks = (state.listTasks?.[date] || untimed(state.tasks[date])).slice(0, TASKS_PER_DAY);
@@ -311,6 +313,10 @@ function renderTasks(cell, focusEmpty = false) {
         const v = input.value.trim();
         if (!v || committed) return;
         committed = true;
+        // 同じ日・同じ内容の追加が短い間に続いたら無視（二重登録の防止）
+        const key = `${date}|${v}`;
+        if ((recentAdds.get(key) || 0) > Date.now() - 10_000) { input.value = ''; return; }
+        recentAdds.set(key, Date.now());
         const temp = { id: 'tmp-' + Date.now(), text: v };
         (state.tasks[date] ||= []).push(temp);
         if (state.listTasks?.[date] && !parseTaskTime(v)) state.listTasks[date].push(temp);
