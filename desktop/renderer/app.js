@@ -156,7 +156,8 @@ function updateScale() {
 
 /* ---------- 週間バーチカル ---------- */
 function renderWeek(root) {
-  const weekStart = startOfWeek(state.anchor);
+  // 表示する7日間の初日：今日始まり（state.app.startToday）なら基準日、そうでなければその週の月曜
+  const weekStart = state.app?.startToday ? startOfDay(state.anchor) : startOfWeek(state.anchor);
   const days = [...Array(7)].map((_, i) => addDays(weekStart, i));
   const today = new Date();
   const end = days[6];
@@ -424,6 +425,9 @@ function render() {
   else if (state.view === 'month') renderMonth(root);
   else renderWeek(root);
   $('#tab-week').classList.toggle('active', state.view === 'week');
+  // 押すと切り替わる方を表示（月間表示では使わないので隠す）
+  $('#btn-start').textContent = state.app?.startToday ? '⇄ 月曜から' : '⇄ 今日から';
+  $('#btn-start').hidden = !ready || state.view !== 'week';
   $('#tab-month').classList.toggle('active', state.view === 'month');
   const top = state.app?.mode === 'top';
   $('#btn-mode').textContent = top ? '📌' : '🖥';
@@ -642,6 +646,11 @@ function bind() {
   $('#tab-month').addEventListener('click', () => setView('month'));
   $('#btn-sync').addEventListener('click', reload);
   $('#btn-settings').addEventListener('click', openSettings);
+  $('#btn-start').addEventListener('click', async () => {
+    state.app = await api.settings({ startToday: !state.app.startToday });
+    state.anchor = startOfDay(new Date()); // 切り替えたら今日を含む週を表示
+    render(); reload();
+  });
   $('#btn-hide').addEventListener('click', () => api.hide());
   $('#btn-mode').addEventListener('click', async () => {
     state.app = await api.settings({ mode: state.app.mode === 'top' ? 'desktop' : 'top' });

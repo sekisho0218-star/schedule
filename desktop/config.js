@@ -15,6 +15,7 @@ const defaults = {
   opacity: 1,
   autostart: false,
   view: 'week',
+  startToday: false, // 週間表示：true なら今日を一番左（false は月曜始まり）
   bounds: null,
   // シフト表との連携
   shift: {

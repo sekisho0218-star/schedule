@@ -133,6 +133,7 @@ function publicState() {
     opacity: cfg.opacity,
     autostart: cfg.autostart,
     view: cfg.view,
+    startToday: !!cfg.startToday,
     version: app.getVersion(),
     shift: {
       enabled: cfg.shift.enabled, auto: cfg.shift.auto, url: cfg.shift.url, teacher: cfg.shift.teacher, calendarId: cfg.shift.calendarId,
@@ -225,7 +226,7 @@ const wrap = (fn) => async (_e, ...args) => {
 ipcMain.handle('state', () => publicState());
 ipcMain.handle('settings', (_e, patch) => {
   const allowed = {};
-  for (const k of ['mode', 'locked', 'opacity', 'autostart', 'view']) if (k in patch) allowed[k] = patch[k];
+  for (const k of ['mode', 'locked', 'opacity', 'autostart', 'view', 'startToday']) if (k in patch) allowed[k] = patch[k];
   return setSettings(allowed);
 });
 ipcMain.handle('save-client', (_e, { clientId, clientSecret }) => {

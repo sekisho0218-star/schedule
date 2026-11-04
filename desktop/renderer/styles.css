@@ -195,3 +195,8 @@ dialog input:not([type=checkbox]):not([type=radio]):not([type=range]), dialog te
 .shift-list .tag.update { background: #fff1c9; color: #7a5b00; }
 .shift-list .tag.delete, .shift-list .tag.remove { background: #fbe1df; color: #a1342b; }
 dialog select { font: inherit; font-size: 14px; padding: 6px; border: 1px solid #ccc; border-radius: 6px; width: 100%; }
+
+/* 今日始まり ⇄ 月曜始まり の切り替え */
+.start-btn { background: #e2ded4; border-radius: 999px; font-size: calc(12px * var(--ts)); height: 24px; padding: 0 10px; }
+.start-btn:hover { background: #d8d3c7; }
+.start-btn[hidden] { display: none; }
