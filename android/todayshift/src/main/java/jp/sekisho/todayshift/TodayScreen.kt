@@ -86,7 +86,7 @@ fun TodayScreen(vm: MainViewModel) {
             Text(status, fontSize = 11.sp, color = if (vm.error != null) Color(0xFFC62828) else SUB, modifier = Modifier.padding(horizontal = 12.dp))
         }
         val day = vm.day
-        Box(Modifier.weight(1f).fillMaxWidth().padding(6.dp)) {
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
             when {
                 vm.sheet == null -> Message(if (vm.url.isBlank()) "⚙ でシフト表の URL を入力してください" else "⟳ でシフト表を読み込んでください")
                 day == null -> Message("この日はシフト表にありません")
@@ -131,58 +131,74 @@ private fun BarButton(label: String, wide: Boolean = false, onClick: () -> Unit)
     ) { Text(label, fontSize = if (wide) 14.sp else 22.sp, color = INK) }
 }
 
-/** シフト表と同じ並び：横に講師、縦に時間帯 */
+/**
+ * シフト表と同じ並び：横に講師、縦に時間帯。
+ * 画面の幅に全員が入るよう、入りきらないときは講師を2段（以上）に分ける（横スクロールなし）。
+ */
 @Composable
 private fun ShiftTable(day: ShiftParser.DayView, myName: String, now: LocalTime?) {
-    BoxWithConstraints(
-        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(PAPER).border(1.dp, LINE, RoundedCornerShape(12.dp)),
-    ) {
-        val timeW = 54.dp
-        val n = day.teachers.size.coerceAtLeast(1)
-        val colW: Dp = maxOf(124.dp, (maxWidth - timeW) / n)
-        val tableW = timeW + colW * n
-        val nowMin = now?.let { it.hour * 60 + it.minute }
-        // 今の時間帯：開始時刻が今以前で、次の時間帯の開始より前
-        val starts = day.rows.mapIndexedNotNull { i, r -> r.startMin?.let { i to it } }
-        val nowRow = nowMin?.let { m ->
-            starts.lastOrNull { it.second <= m }?.let { (i, s) ->
-                val next = starts.firstOrNull { it.first > i }?.second ?: (s + 90)
-                if (m < next) i else null
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val timeW = 42.dp
+        val (perTier, tiers) = Layout.tiers(day.teachers.size, (maxWidth - timeW).value, minColDp = 104f)
+        val colW = (maxWidth - timeW) / perTier
+        val nowRow = now?.let { Layout.nowRow(day, it.hour * 60 + it.minute) }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            day.teachers.chunked(perTier).forEach { group ->
+                Tier(day, group, perTier, timeW, colW, myName, nowRow)
             }
+            if (tiers > 1) Spacer(Modifier.height(4.dp))
         }
-        Column(Modifier.fillMaxSize().horizontalScroll(rememberScrollState())) {
-            // 講師名
-            Row(Modifier.width(tableW).height(IntrinsicSize.Min).background(Color(0xFFFFF8DC)).bottomLine(Color(0xFFF2C230), 2f)) {
-                Box(Modifier.width(timeW))
-                day.teachers.forEach { t ->
-                    val mine = t == myName
-                    Box(
-                        Modifier.width(colW).fillMaxHeight().background(if (mine) MINE_BG else Color.Transparent).leftLine().padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(t, fontSize = 15.sp, fontWeight = if (mine) FontWeight.Bold else FontWeight.Medium, color = INK)
-                    }
+    }
+}
+
+/** 1段分（講師の一部） */
+@Composable
+private fun Tier(
+    day: ShiftParser.DayView,
+    teachers: List<String>,
+    perTier: Int,
+    timeW: Dp,
+    colW: Dp,
+    myName: String,
+    nowRow: Int?,
+) {
+    // この段の講師が誰も入っていない時間帯は出さない
+    val rows = day.rows.withIndex().filter { (_, r) -> teachers.any { r.cells[it]?.isEmpty == false } }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(PAPER).border(1.dp, LINE, RoundedCornerShape(10.dp)),
+    ) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Color(0xFFFFF8DC)).bottomLine(Color(0xFFF2C230), 2f)) {
+            Box(Modifier.width(timeW))
+            teachers.forEach { t ->
+                val mine = t == myName
+                Box(
+                    Modifier.width(colW).fillMaxHeight().background(if (mine) MINE_BG else Color.Transparent).leftLine().padding(vertical = 5.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(t, fontSize = 14.sp, fontWeight = if (mine) FontWeight.Bold else FontWeight.Medium, color = INK, maxLines = 1)
                 }
             }
-            // 時間帯ごと
-            Column(Modifier.width(tableW).weight(1f).verticalScroll(rememberScrollState())) {
-                day.rows.forEachIndexed { i, row ->
-                    val isNow = i == nowRow
-                    Row(Modifier.width(tableW).height(IntrinsicSize.Min).background(if (isNow) NOW_BG else Color.Transparent).bottomLine(LINE, 1f)) {
-                        Box(Modifier.width(timeW).fillMaxHeight().padding(4.dp), contentAlignment = Alignment.TopCenter) {
-                            Text(row.label.ifEmpty { "—" }, fontSize = 13.sp, color = if (isNow) Color(0xFFB45309) else Color(0xFF555555),
-                                fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center, lineHeight = 15.sp)
-                        }
-                        day.teachers.forEach { t ->
-                            val mine = t == myName
-                            Box(
-                                Modifier.width(colW).fillMaxHeight()
-                                    .background(if (mine && !isNow) MINE_BG.copy(alpha = 0.45f) else Color.Transparent)
-                                    .leftLine().padding(5.dp),
-                            ) {
-                                row.cells[t]?.let { Cell(it) }
-                            }
-                        }
+        }
+        if (rows.isEmpty()) {
+            Text("この段の講師はシフトがありません", fontSize = 12.sp, color = SUB, modifier = Modifier.padding(8.dp))
+        }
+        rows.forEach { (i, row) ->
+            val isNow = i == nowRow
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(if (isNow) NOW_BG else Color.Transparent).bottomLine(LINE, 1f)) {
+                Box(Modifier.width(timeW).fillMaxHeight().padding(top = 4.dp), contentAlignment = Alignment.TopCenter) {
+                    Text(
+                        row.label.ifEmpty { "—" }, fontSize = 12.sp, lineHeight = 13.sp, textAlign = TextAlign.Center,
+                        color = if (isNow) Color(0xFFB45309) else Color(0xFF555555), fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+                teachers.forEach { t ->
+                    val mine = t == myName
+                    Box(
+                        Modifier.width(colW).fillMaxHeight()
+                            .background(if (mine && !isNow) MINE_BG.copy(alpha = 0.45f) else Color.Transparent)
+                            .leftLine().padding(horizontal = 4.dp, vertical = 4.dp),
+                    ) {
+                        row.cells[t]?.let { Cell(it) }
                     }
                 }
             }
@@ -193,28 +209,29 @@ private fun ShiftTable(day: ShiftParser.DayView, myName: String, now: LocalTime?
 /** 1コマ分：学年・名前・科目（シフト表の書き方のまま） */
 @Composable
 private fun Cell(c: ShiftParser.CellView) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         c.students.forEach { s ->
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     s.grade?.let { GradeChip(it) }
-                    Text(s.name, fontSize = 14.sp, color = INK, fontWeight = FontWeight.Medium)
+                    Text(Layout.displayName(s.name), fontSize = 13.sp, color = INK, fontWeight = FontWeight.Medium, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
-                s.subject?.let { Text(it, fontSize = 12.sp, color = Color(0xFF555555), modifier = Modifier.padding(start = 2.dp)) }
+                s.subject?.let { Text(it, fontSize = 11.sp, lineHeight = 12.sp, color = Color(0xFF555555), modifier = Modifier.padding(start = 2.dp)) }
             }
         }
         c.group?.let { g ->
             val parts = g.split(" ", limit = 2)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GradeChip(parts[0])
-                Text(parts.getOrElse(1) { "" } + "（集団）", fontSize = 14.sp, color = INK, fontWeight = FontWeight.Medium)
+                Text(parts.getOrElse(1) { "" } + "（集団）", fontSize = 13.sp, color = INK, fontWeight = FontWeight.Medium)
             }
         }
-        c.texts.forEach { Text(it, fontSize = 13.sp, color = INK) }
+        c.texts.forEach { Text(it, fontSize = 12.sp, color = INK) }
         c.guests.forEach { (time, title) ->
             Text(
-                listOfNotNull(time, title).joinToString(" "), fontSize = 13.sp, color = Color(0xFF8A2E2E),
-                modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(Color(0xFFFBE3E0)).padding(horizontal = 5.dp, vertical = 1.dp),
+                listOfNotNull(time, title).joinToString(" "), fontSize = 12.sp, color = Color(0xFF8A2E2E),
+                modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(Color(0xFFFBE3E0)).padding(horizontal = 4.dp),
             )
         }
     }
@@ -229,8 +246,8 @@ private fun GradeChip(grade: String) {
         else -> Color(0xFFEEEEEE) to SUB
     }
     Text(
-        grade, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = fg,
-        modifier = Modifier.padding(end = 4.dp).clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 4.dp),
+        grade, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = fg,
+        modifier = Modifier.padding(end = 3.dp).clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 3.dp),
     )
 }
 

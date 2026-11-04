@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">今日のシフト</string>
+    <string name="widget_name">今日のシフト</string>
+    <string name="widget_description">シフト表から今日の全員のシフトを表示します</string>
 </resources>

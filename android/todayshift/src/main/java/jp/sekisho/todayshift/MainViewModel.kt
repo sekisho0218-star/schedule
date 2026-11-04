@@ -6,6 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.glance.appwidget.updateAll
+import jp.sekisho.todayshift.widget.TodayRefreshWorker
+import jp.sekisho.todayshift.widget.TodayWidget
 import jp.sekisho.vertical.shift.ShiftParser
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -39,7 +42,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         loading = true
         viewModelScope.launch {
             runCatching { repo.fetch() }
-                .onSuccess { sheet = it; error = null; lastFetched = repo.lastFetched }
+                .onSuccess {
+                    sheet = it; error = null; lastFetched = repo.lastFetched
+                    // ウィジェットにも反映し、30分ごとの更新を登録
+                    val ctx = getApplication<Application>()
+                    runCatching { TodayWidget().updateAll(ctx) }
+                    TodayRefreshWorker.schedule(ctx)
+                }
                 .onFailure { error = "シフト表を読み込めませんでした：${it.message ?: it.javaClass.simpleName}" }
             loading = false
         }
