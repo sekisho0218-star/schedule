@@ -70,8 +70,8 @@ import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalTime
 
-private val AXIS_W: Dp @Composable get() = sdp(34f)
-private val TASK_ROW_H: Dp @Composable get() = sdp(28f)
+private val AXIS_W: Dp @Composable get() = sdp(26f)
+private val TASK_ROW_H: Dp @Composable get() = sdp(24f)
 private val HOURS = Dates.END_HOUR - Dates.START_HOUR
 
 @Composable
@@ -109,7 +109,7 @@ fun WeekScreen(
     val today = LocalDate.now()
 
     BoxWithConstraints(modifier.fillMaxSize().padding(4.dp)) {
-    val scale = textScaleFor((maxWidth - 34.dp) / 7)
+    val scale = textScaleFor((maxWidth - 26.dp) / 7)
     CompositionLocalProvider(LocalTextScale provides scale) {
     Column(
         Modifier
@@ -128,25 +128,27 @@ fun WeekScreen(
         // 終日予定
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(Modifier.width(AXIS_W).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("ALL", fontSize = ssp(7f), color = c(Palette.FAINT), letterSpacing = 1.5.sp)
+                Text("ALL", fontSize = ssp(6.5f), color = c(Palette.FAINT), letterSpacing = 1.sp)
             }
             days.forEach { d ->
                 Column(
-                    Modifier.weight(1f).fillMaxHeight().heightIn(min = sdp(22f)).leftDashed().padding(3.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    Modifier.weight(1f).fillMaxHeight().heightIn(min = sdp(18f)).leftDashed().padding(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     val list = dayEvents.getValue(d).allDay
                     list.take(3).forEach { ev ->
                         Text(
                             ev.title,
-                            fontSize = ssp(9.5f),
+                            fontSize = ssp(8.5f),
+                            lineHeight = ssp(10f),
                             color = c(Palette.SUB),
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
+                            style = TextStyle(lineBreak = androidx.compose.ui.text.style.LineBreak.Simple),
                             modifier = Modifier.fillMaxWidth()
                                 .border(1.dp, c(Palette.LINE), RoundedCornerShape(2.dp))
                                 .clickable { onItemClick(ev) }
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
+                                .padding(horizontal = 2.dp, vertical = 1.dp),
                         )
                     }
                     if (list.size > 3) Text("+${list.size - 3}", fontSize = ssp(8f), color = c(Palette.SUB))
@@ -175,7 +177,7 @@ fun WeekScreen(
                 }
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(c(Palette.TASKS_BG)).topLine(c(Palette.LINE))) {
                     Box(Modifier.width(AXIS_W).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        Text("TASKS", fontSize = ssp(7f), color = c(Palette.FAINT), letterSpacing = 1.5.sp)
+                        Text("TASK", fontSize = ssp(6.5f), color = c(Palette.FAINT), letterSpacing = 1.sp)
                     }
                     days.forEach { d ->
                         // 同期のたびに入力欄を作り直さない（作り直すと入力途中の文字が追加されることがあった）
@@ -283,26 +285,32 @@ private fun DayTimeline(
             val bottom = (s.endMin - Dates.START_MIN).coerceAtMost(Dates.RANGE_MIN)
             if (bottom <= 0 || top >= Dates.RANGE_MIN) return@forEach
             val h = (hourH * (bottom - top) / 60).coerceAtLeast(sdp(16f))
-            // 枠に入る行数（上下の余白を除いた高さ ÷ 1行の高さ）。入りきらない分は「…」
-            val lineDp = 13f * LocalTextScale.current * LocalDensity.current.fontScale
-            val maxLines = (((h - 6.dp).value) / lineDp).toInt().coerceAtLeast(1)
+            // 予定名が枠に収まるいちばん大きな文字の大きさを選ぶ（列が狭いスマホでも読めるように）
+            val fit = fitText(
+                s.event.title,
+                widthDp = (colW / s.ncols).value - 2f - 5.5f,
+                heightDp = h.value - 2f - 2f,
+                maxSp = 10.5f * LocalTextScale.current,
+                fontScale = LocalDensity.current.fontScale,
+            )
             Box(
                 Modifier
                     .offset(x = colW * s.col / s.ncols, y = hourH * top / 60)
                     .width(colW / s.ncols)
                     .height(h)
-                    .padding(horizontal = 2.dp, vertical = 1.dp)
+                    .padding(horizontal = 1.dp, vertical = 1.dp)
                     .let { if (s.event.taskId != null) it.taskStyle() else it.eventStyle(s.event.color) }
                     .clickable { onEventClick(s.event) }
-                    .padding(start = 5.dp, end = 3.dp, top = 2.dp, bottom = 2.dp),
+                    .padding(start = 4.dp, end = 1.5.dp, top = 1.dp, bottom = 1.dp),
             ) {
                 Text(
                     s.event.title,
-                    fontSize = ssp(11f),
-                    lineHeight = ssp(13f),
+                    fontSize = fit.sizeSp.sp,
+                    lineHeight = (fit.sizeSp * LINE_RATIO).sp,
+                    style = TextStyle(lineBreak = androidx.compose.ui.text.style.LineBreak.Simple),
                     color = if (s.event.taskId != null) c(Palette.SUB) else Color(Palette.eventInk(s.event.color)),
                     fontWeight = FontWeight.Normal,
-                    maxLines = maxLines,
+                    maxLines = fit.maxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -406,4 +414,39 @@ private fun EmptyTaskRow(modifier: Modifier, onAdd: (String) -> Unit) {
             }
         },
     )
+}
+
+
+/** 予定名の行の高さ（文字の大きさに対する倍率） */
+private const val LINE_RATIO = 1.17f
+
+private class Fit(val sizeSp: Float, val maxLines: Int)
+
+/**
+ * 枠（幅×高さ dp）に予定名が収まる、いちばん大きな文字の大きさを選ぶ。
+ * 日本語は1文字＝文字の大きさ、英数字は約0.55文字分として、1文字ずつ折り返したときの行数で見積もる。
+ * 最小（7.5sp）でも入りきらないときは、入る行数まで表示して残りは「…」。
+ */
+private fun fitText(text: String, widthDp: Float, heightDp: Float, maxSp: Float, fontScale: Float): Fit {
+    val units = text.map { ch -> if (ch.code < 0x2E80) 0.56f else 1f }
+    fun linesAt(sizeDp: Float): Int {
+        if (widthDp <= sizeDp) return units.size.coerceAtLeast(1)
+        var lines = 1
+        var x = 0f
+        for (u in units) {
+            val w = u * sizeDp
+            if (x + w > widthDp + 0.5f) { lines++; x = w } else x += w
+        }
+        return lines
+    }
+    val minSp = 7.5f
+    var sp = maxSp
+    while (sp >= minSp) {
+        val sizeDp = sp * fontScale
+        val fits = (heightDp / (sizeDp * LINE_RATIO)).toInt().coerceAtLeast(1)
+        if (linesAt(sizeDp) <= fits) return Fit(sp, fits)
+        sp -= 0.5f
+    }
+    val sizeDp = minSp * fontScale
+    return Fit(minSp, (heightDp / (sizeDp * LINE_RATIO)).toInt().coerceAtLeast(1))
 }

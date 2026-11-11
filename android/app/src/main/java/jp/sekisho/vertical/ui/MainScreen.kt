@@ -259,7 +259,7 @@ private fun TopBar(
     val caption = if (mode == ViewMode.WEEK) "WEEK $weekNo — ${months[ws.monthValue - 1]} ${ws.year}" else "${anchor.year}"
     Column(Modifier.fillMaxWidth().background(c(Palette.BG)).statusBarsPadding().padding(horizontal = 18.dp)) {
         // 1行目：前・今日・次 ／ 同期・設定（控えめな文字）
-        Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
             BarButton("‹", onPrev)
             BarButton("TODAY", onToday, wide = true)
             BarButton("›", onNext)
@@ -268,21 +268,21 @@ private fun TopBar(
             BarButton("⚙", onSettings)
         }
         // 2行目：セリフ体の大きな見出し ／ WEEK・MONTH の切り替え（下線）
-        Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Text(caption, fontSize = 9.5.sp, letterSpacing = 2.5.sp, color = c(Palette.SUB), fontWeight = FontWeight.Medium)
                 val serif = TextStyle(fontFamily = Fonts.Serif, fontFeatureSettings = Fonts.LINING, fontWeight = FontWeight.Medium, color = c(Palette.INK))
                 if (mode == ViewMode.WEEK) {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text("${ws.dayOfMonth}", style = serif, fontSize = 44.sp, lineHeight = 44.sp)
+                        Text("${ws.dayOfMonth}", style = serif, fontSize = 36.sp, lineHeight = 36.sp)
                         Text(
-                            " to ", style = serif, fontSize = 22.sp, color = c(Palette.SUB),
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, modifier = Modifier.padding(bottom = 5.dp),
+                            " to ", style = serif, fontSize = 18.sp, color = c(Palette.SUB),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, modifier = Modifier.padding(bottom = 4.dp),
                         )
-                        Text("${we.dayOfMonth}", style = serif, fontSize = 44.sp, lineHeight = 44.sp)
+                        Text("${we.dayOfMonth}", style = serif, fontSize = 36.sp, lineHeight = 36.sp)
                     }
                 } else {
-                    Text(months[anchor.monthValue - 1].lowercase().replaceFirstChar { it.uppercase() }, style = serif, fontSize = 40.sp, lineHeight = 44.sp)
+                    Text(months[anchor.monthValue - 1].lowercase().replaceFirstChar { it.uppercase() }, style = serif, fontSize = 34.sp, lineHeight = 38.sp)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 8.dp)) {
