@@ -294,6 +294,25 @@ object ShiftParser {
         return out
     }
 
+    private fun hm(h: Int, m: Int) = h * 60 + m
+
+    /** 授業の時間割：シフト表の時刻欄 → 終了時刻 */
+    private val SLOT_END = mapOf(hm(16, 5) to hm(17, 30), hm(17, 35) to hm(19, 0), hm(19, 5) to hm(20, 30), hm(20, 35) to hm(22, 0))
+
+    /** 授業の開始・終了（分）。月火木金の16:05枠は16:40開始、水は16:05開始。 */
+    private fun lessonTime(labelStart: Int, override: Int?, date: LocalDate, elem: Boolean): Pair<Int, Int> {
+        val slotEnd = SLOT_END[labelStart]
+        if (slotEnd != null) {
+            if (override != null) {
+                return if (override < slotEnd) override to slotEnd else override to override + (if (elem) 50 else 85)
+            }
+            val start = if (labelStart == hm(16, 5) && date.dayOfWeek.value in listOf(1, 2, 4, 5)) hm(16, 40) else labelStart
+            return start to slotEnd
+        }
+        val start = override ?: labelStart
+        return start to start + (if (elem) 60 else 90)
+    }
+
     /**
      * 講師のコマを読み取る。時刻は手帳の予定に合わせる：開始は「16:05→16:00」のように丸め、
      * 小学生だけのコマは60分（平日16:05の枠は16:30〜）、それ以外は90分。
@@ -312,7 +331,6 @@ object ShiftParser {
                 if (tc + 15 > w) break
                 val date = resolveDate(g[top][tc + 1], today) ?: continue
                 val c = (tc + 1 until tc + 15).firstOrNull { g[top + 1][it].trim() == teacher } ?: continue
-                val weekday = date.dayOfWeek.value in 1..5
                 for (off in 2..23 step 3) {
                     val l = top + off
                     if (l + 2 >= g.size) break
@@ -350,16 +368,15 @@ object ShiftParser {
                     val freeOnly = slot.students.isEmpty() && slot.group == null
                     // 開始時刻：「10:00(小) 10:30(中)」のような枠は小学生かどうかで選ぶ
                     val times = TIME_RE.findAll(toHalf(label)).map { it.groupValues[1].toInt() * 60 + it.groupValues[2].toInt() }.toList()
-                    var start = slot.override ?: (if (times.size > 1 && label.contains("中") && !elem) times[1] else times.firstOrNull())
-                    if (start == null) { notes += "$date $title"; continue }
-                    if (start % 30 == 5) start -= 5 // 16:05 → 16:00
-                    if (weekday && elem && start == 16 * 60 && slot.override == null) start = 16 * 60 + 30
+                    val labelStart = if (times.size > 1 && label.contains("中") && !elem) times[1] else times.firstOrNull()
+                    if (labelStart == null && slot.override == null) { notes += "$date $title"; continue }
+                    val (start, end) = lessonTime(labelStart ?: slot.override!!, slot.override, date, elem)
                     // 授業ではない書き込み（「ダスキン見積もり」など）は、確認してから反映する「授業以外」
                     if (freeOnly && !COURSE_RE.containsMatchIn(title)) {
                         others += Other(date, start, minOf(start + 60, 24 * 60), title, false)
                         continue
                     }
-                    lessons += Lesson(date, start, minOf(start + if (elem) 60 else 90, 24 * 60), title)
+                    lessons += Lesson(date, start, minOf(end, 24 * 60), title)
                 }
             }
         }

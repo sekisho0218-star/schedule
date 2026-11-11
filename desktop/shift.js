@@ -180,10 +180,35 @@ function readSlot(cells, roster) {
   return out;
 }
 
+const hm2m = (h, m) => h * 60 + m;
+/** 授業の時間割：シフト表の時刻欄 → 終了時刻 */
+const SLOT_END = { [hm2m(16, 5)]: hm2m(17, 30), [hm2m(17, 35)]: hm2m(19, 0), [hm2m(19, 5)]: hm2m(20, 30), [hm2m(20, 35)]: hm2m(22, 0) };
+
+/**
+ * 授業の開始・終了時刻。
+ * - 16:05 の枠：月・火・木・金は 16:40〜17:30、水（と土）は 16:05〜17:30
+ * - 17:35〜19:00 ／ 19:05〜20:30 ／ 20:35〜22:00
+ * - 「数学(16:05～)」のように枠の中の時刻が書いてあれば、その時刻から枠の終わりまで
+ * - 時間割にない時刻（土曜の午前など）は、小学生だけなら60分、それ以外は90分
+ */
+function lessonTime(labelStart, override, date, elem) {
+  const slotEnd = SLOT_END[labelStart];
+  if (slotEnd != null) {
+    if (override != null) {
+      return override < slotEnd ? { start: override, end: slotEnd } : { start: override, end: override + (elem ? 50 : 85) };
+    }
+    const dow = date.getDay();
+    const start = labelStart === hm2m(16, 5) && [1, 2, 4, 5].includes(dow) ? hm2m(16, 40) : labelStart;
+    return { start, end: slotEnd };
+  }
+  const start = override ?? labelStart;
+  return { start, end: start + (elem ? 60 : 90) };
+}
+
 /**
  * 講師のコマを読み取る。
  * lessons: 授業（自動で反映） / others: 授業以外（確認して反映） / notes: 読み取れなかった書き込み
- * 時刻は手帳の予定に合わせる：開始は「16:05→16:00」のように丸め、小学生だけのコマは60分（平日16:05の枠は16:30〜）、それ以外は90分。
+ * 時刻は塾の時間割どおり（lessonTime を参照）。
  */
 function extractTeacher(grid, teacher, roster, today = new Date()) {
   const W = Math.max(...grid.map((r) => r.length));
@@ -199,7 +224,6 @@ function extractTeacher(grid, teacher, roster, today = new Date()) {
       let c = -1;
       for (let k = tc + 1; k < tc + 15; k++) if ((g[top + 1][k] || '').trim() === teacher) { c = k; break; }
       if (c < 0) continue;
-      const weekday = date.getDay() >= 1 && date.getDay() <= 5;
       for (let off = 2; off <= 23; off += 3) {
         const L = top + off;
         if (L + 2 >= g.length) break;
@@ -237,16 +261,15 @@ function extractTeacher(grid, teacher, roster, today = new Date()) {
         const freeOnly = !slot.students.length && !slot.group;
         // 開始時刻：「10:00(小) 10:30(中)」のような枠は小学生かどうかで選ぶ
         const times = [...toHalf(label).matchAll(/(\d{1,2})[:：](\d{2})/g)].map((m) => Number(m[1]) * 60 + Number(m[2]));
-        let start = slot.override ?? (times.length > 1 && /中/.test(label) && !elem ? times[1] : times[0]);
-        if (start == null) { notes.push({ date, text: title }); continue; }
-        if (start % 30 === 5) start -= 5; // 16:05 → 16:00
-        if (weekday && elem && start === 16 * 60 && slot.override == null) start = 16 * 60 + 30;
+        const labelStart = times.length > 1 && /中/.test(label) && !elem ? times[1] : times[0];
+        if (labelStart == null && slot.override == null) { notes.push({ date, text: title }); continue; }
+        const { start, end } = lessonTime(labelStart ?? slot.override, slot.override, date, elem);
         // 授業ではない書き込み（「ダスキン見積もり」など）は、確認してから反映する「授業以外」
         if (freeOnly && !COURSE_RE.test(title)) {
           others.push({ date, start, end: Math.min(start + 60, 24 * 60), title });
           continue;
         }
-        lessons.push({ date, start, end: Math.min(start + (elem ? 60 : 90), 24 * 60), title });
+        lessons.push({ date, start, end: Math.min(end, 24 * 60), title });
       }
     }
   }
