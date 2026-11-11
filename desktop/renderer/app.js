@@ -4,7 +4,28 @@
 const api = window.api;
 
 /* ---------- 日付（月曜始まり・ローカル時刻） ---------- */
-const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+/** ISO 週番号 */
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+}
+/** 見出し：小さな英字の行と、セリフ体の大きな文字 */
+function setHeadline(caption, titleHtml) {
+  $('#caption').textContent = caption;
+  $('#title').innerHTML = titleHtml;
+}
+// 線で描いたアイコン（表示モード・固定）
+const ICONS = {
+  desktop: '<svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="8" rx="1"/><path d="M6 13.5h4M8 11v2.5"/></svg>',
+  pin: '<svg viewBox="0 0 16 16"><path d="M6 2.5h4l-.6 4 2.1 2.2H4.5l2.1-2.2z"/><path d="M8 8.7v4.8"/></svg>',
+  lock: '<svg viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  unlock: '<svg viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-.9"/></svg>',
+};
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parseYmd = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -111,16 +132,29 @@ async function call(promise, errorPrefix) {
 }
 
 /* ---------- 予定の整理 ---------- */
+/** カレンダーの色をくすませる（Greige & Copper）：背景・左端の線・文字の3色 */
 function eventColor(ev) {
-  const hex = (ev.color || '#4a72b5').replace('#', '');
-  const n = parseInt(hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex, 16);
-  const mix = (v) => Math.round(v + (255 - v) * 0.5);
-  return { ev: `#${hex}`, bg: `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})` };
+  let hex = (ev.color || '#4a72b5').replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  const n = parseInt(hex, 16);
+  const r = ((n >> 16) & 255) / 255; const g = ((n >> 8) & 255) / 255; const b = (n & 255) / 255;
+  const max = Math.max(r, g, b); const min = Math.min(r, g, b); const l = (max + min) / 2;
+  let h = 0; let s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60;
+  }
+  const tone = (satScale, light) => `hsl(${h.toFixed(1)} ${(s * satScale * 100).toFixed(1)}% ${(light * 100).toFixed(1)}%)`;
+  return { bg: tone(0.30, 0.895), bar: tone(0.38, 0.50), ink: tone(0.30, 0.21) };
 }
 function styleEvent(node, ev) {
+  if (ev.task) { node.classList.add('task'); return; }
   const c = eventColor(ev);
-  node.style.setProperty('--ev', c.ev);
+  node.style.setProperty('--ev', c.bar);
   node.style.setProperty('--ev-bg', c.bg);
+  node.style.setProperty('--ev-ink', c.ink);
 }
 
 function eventsOn(day) {
@@ -161,9 +195,8 @@ function renderWeek(root) {
   const days = [...Array(7)].map((_, i) => addDays(weekStart, i));
   const today = new Date();
   const end = days[6];
-  $('#title').textContent = weekStart.getMonth() === end.getMonth()
-    ? `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月${weekStart.getDate()}–${end.getDate()}日`
-    : `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}/${weekStart.getDate()}–${end.getMonth() + 1}/${end.getDate()}`;
+  setHeadline(`WEEK ${isoWeek(weekStart)} — ${MONTHS[weekStart.getMonth()]} ${weekStart.getFullYear()}`,
+    `${weekStart.getDate()}<i>to</i>${end.getDate()}`);
 
   const grid = el('div', 'week');
   grid.append(el('div', 'corner'));
@@ -175,7 +208,7 @@ function renderWeek(root) {
     grid.append(h);
   }
 
-  grid.append(el('div', 'axis-label', '終日'));
+  grid.append(el('div', 'axis-label', 'ALL'));
   const per = days.map(eventsOn);
   // タスクリストに出すタスク（スケジュールに表示済みのものを除く）
   state.listTasks = {};
@@ -199,7 +232,7 @@ function renderWeek(root) {
   tl.append(axis);
   const totalMin = (END_HOUR - START_HOUR) * 60;
   days.forEach((d, i) => {
-    const col = el('div', `day-col ${dayKind(d)}`);
+    const col = el('div', `day-col ${dayKind(d)}${sameDay(d, today) ? ' today' : ''}`);
     for (let k = 1; k < (END_HOUR - START_HOUR) * 2; k++) {
       const line = el('div', `hline${k % 2 ? ' half' : ''}`);
       line.style.top = `${(k / ((END_HOUR - START_HOUR) * 2)) * 100}%`;
@@ -247,7 +280,7 @@ function renderWeek(root) {
   grid.append(scroll);
 
   // タスク（各日5件）
-  grid.append(el('div', 'axis-label tasks-label', 'TASK'));
+  grid.append(el('div', 'axis-label tasks-label', 'TASKS'));
   for (const d of days) {
     const cell = el('div', 'tasks'); cell.dataset.date = ymd(d);
     renderTasks(cell);
@@ -350,7 +383,7 @@ function renderMonth(root) {
   const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
   const weeks = Math.ceil(((last - gridStart) / 86400000 + 1) / 7);
   const today = new Date();
-  $('#title').textContent = `${first.getFullYear()}年${first.getMonth() + 1}月`;
+  setHeadline(`${first.getFullYear()}`, MONTHS[first.getMonth()].charAt(0) + MONTHS[first.getMonth()].slice(1).toLowerCase());
 
   const grid = el('div', 'month');
   grid.style.gridTemplateRows = `auto repeat(${weeks}, minmax(0, 1fr))`;
@@ -368,7 +401,7 @@ function renderMonth(root) {
     const { allDay, timed } = dayEv;
     const items = [...allDay.map((ev) => ({ ev, label: ev.title, cls: 'allday' })), ...timed.map(({ ev }) => ({ ev, label: ev.title, cls: '' }))];
     for (const it of items.slice(0, maxItems)) {
-      const m = el('div', `mitem ${it.cls}`, it.label); styleEvent(m, it.ev); m.title = it.label;
+      const m = el('div', `mitem ev-style ${it.cls}`, it.label); styleEvent(m, it.ev); m.title = it.label;
       if (it.ev.task) m.addEventListener('click', (e) => { e.stopPropagation(); openTaskDialog(it.ev.taskDate, it.ev.task); });
       cell.append(m);
     }
@@ -383,7 +416,7 @@ function renderMonth(root) {
 
 /* ---------- ログインの期限切れ ---------- */
 function renderExpired(root) {
-  $('#title').textContent = 'バーチカル手帳';
+  setHeadline('VERTICAL TECHO', 'Planner');
   const box = el('div', 'setup');
   const waiting = state.app.signingIn;
   box.innerHTML = `<h2>Google へのログインが必要です</h2>
@@ -408,7 +441,7 @@ async function signIn() {
 
 /* ---------- 初期設定の案内 ---------- */
 function renderSetup(root) {
-  $('#title').textContent = 'バーチカル手帳';
+  setHeadline('VERTICAL TECHO', 'Planner');
   const box = el('div', 'setup');
   box.innerHTML = `<h2>はじめに</h2>
     <p>Google カレンダーの予定と Google ToDo リストのタスクを表示するには、Google へのログインが必要です。</p>
@@ -432,14 +465,15 @@ function render() {
   else renderWeek(root);
   $('#tab-week').classList.toggle('active', state.view === 'week');
   // 押すと切り替わる方を表示（月間表示では使わないので隠す）
-  $('#btn-start').textContent = state.app?.startToday ? '⇄ 月曜から' : '⇄ 今日から';
+  $('#btn-start').textContent = state.app?.startToday ? 'FROM MON' : 'FROM TODAY';
+  $('#btn-start').title = state.app?.startToday ? '月曜始まりに戻す' : '今日を一番左にする';
   $('#btn-start').hidden = !ready || state.view !== 'week';
   $('#tab-month').classList.toggle('active', state.view === 'month');
   const top = state.app?.mode === 'top';
-  $('#btn-mode').textContent = top ? '📌' : '🖥';
+  $('#btn-mode').innerHTML = top ? ICONS.pin : ICONS.desktop;
   $('#btn-mode').title = top ? '常に手前に表示中（クリックでデスクトップに貼り付け）' : 'デスクトップに貼り付け中（クリックで常に手前に表示）';
   $('#btn-mode').classList.toggle('on', top);
-  $('#btn-lock').textContent = state.app?.locked ? '🔒' : '🔓';
+  $('#btn-lock').innerHTML = state.app?.locked ? ICONS.lock : ICONS.unlock;
   $('#btn-lock').classList.toggle('on', !!state.app?.locked);
   document.body.classList.toggle('locked', !!state.app?.locked);
 }

@@ -82,3 +82,7 @@ app/src/main/java/jp/sekisho/vertical/
 ```
 
 動作環境：Android 8.0（API 26）以上
+
+## 書体
+
+見出し・日付・時刻は Cormorant Garamond、本文は Inter Tight を同梱しています（どちらも SIL Open Font License 1.1。`app/src/main/assets/licenses/OFL-*.txt`）。日本語は端末の標準書体で表示します。

@@ -112,3 +112,7 @@ npm run dist       # Windows インストーラーを作成（dist/）
 
 `main.js`（ウィンドウ・タスクトレイ・表示モード）、`google.js`（Google ログインと API）、`config.js`（設定の保存。トークンは Windows の暗号化機能で保護）、`renderer/`（画面）。
 GitHub Actions（`.github/workflows/windows.yml`）が `desktop/` の変更ごとにインストーラーを作り、Releases の `latest-windows` に置きます。
+
+## 書体
+
+見出し・日付・時刻は Cormorant Garamond、本文は Inter Tight を同梱しています（どちらも SIL Open Font License 1.1。`renderer/fonts/OFL-*.txt`）。日本語は Windows の標準書体で表示します。
