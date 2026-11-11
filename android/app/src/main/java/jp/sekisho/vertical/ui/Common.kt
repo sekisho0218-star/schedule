@@ -9,7 +9,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -44,14 +43,25 @@ fun Modifier.bottomLine(color: Color, width: Float = 2f) = drawBehind {
     drawLine(color, Offset(0f, size.height - w / 2), Offset(size.width, size.height - w / 2), w)
 }
 
-/** 予定の見た目：角丸・薄い影・予定の色を薄くした背景 */
+/** 予定の見た目：角を少しだけ丸め、くすませた予定の色の背景＋左端に細い線（Greige & Copper） */
 fun Modifier.eventStyle(color: Int) = this
-    .shadow(1.dp, androidx.compose.foundation.shape.RoundedCornerShape(6.dp), clip = false)
-    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+    .clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
     .background(Color(Palette.eventBg(color)))
+    .drawBehind { drawRect(Color(Palette.eventBar(color)), size = androidx.compose.ui.geometry.Size(1.5.dp.toPx(), size.height)) }
 
-/** 列の左側の破線 */
-fun Modifier.leftDashed(color: Color = c(Palette.LINE)) = drawBehind {
-    drawLine(color, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx(),
-        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())))
+/** 時刻付きタスクの見た目：背景なし・点線の枠 */
+fun Modifier.taskStyle() = drawBehind {
+    val w = 1.dp.toPx()
+    drawRoundRect(
+        Color(Palette.FAINT),
+        topLeft = Offset(w / 2, w / 2),
+        size = androidx.compose.ui.geometry.Size(size.width - w, size.height - w),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+        style = androidx.compose.ui.graphics.drawscope.Stroke(w, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 2.dp.toPx()))),
+    )
+}
+
+/** 列の左側の細い線（以前は破線） */
+fun Modifier.leftDashed(color: Color = c(Palette.LINE_SOFT)) = drawBehind {
+    drawLine(color, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx())
 }

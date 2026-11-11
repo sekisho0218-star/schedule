@@ -34,6 +34,9 @@ object Dates {
 
     fun dowJa(d: LocalDate): String = DOW_JA[d.dayOfWeek.value - 1]
 
+    private val DOW_EN = arrayOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+    fun dowEn(d: LocalDate): String = DOW_EN[d.dayOfWeek.value - 1]
+
     fun startMillis(d: LocalDate): Long = d.atStartOfDay(zone).toInstant().toEpochMilli()
 
     /** 終日予定のミリ秒（UTC 0:00）→ 日付 */

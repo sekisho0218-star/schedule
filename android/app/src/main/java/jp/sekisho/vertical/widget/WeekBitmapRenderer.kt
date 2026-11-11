@@ -32,6 +32,11 @@ object WeekBitmapRenderer {
         dayEvents: Map<LocalDate, DayEvents>,
         today: LocalDate,
         now: LocalTime,
+        /** セリフ体（日付・時刻）。null なら標準の書体 */
+        serif: Typeface? = null,
+        serifItalic: Typeface? = null,
+        /** 本文の書体（Inter Tight） */
+        sans: Typeface? = null,
     ): Bitmap {
         val w = (widthDp * scale).toInt().coerceAtLeast(1)
         val h = (heightDp * scale).toInt().coerceAtLeast(1)
@@ -52,9 +57,14 @@ object WeekBitmapRenderer {
         val colW = (w - axisW) / 7f
         val headerH = sz(30f)
         val eventText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = sans ?: Typeface.DEFAULT
             textSize = sz(9.5f)
             color = Palette.EVENT_TEXT
+        }
+        val serifPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = serif ?: Typeface.SERIF
+            fontFeatureSettings = "lnum" // 高さのそろった数字
+            textAlign = Paint.Align.CENTER
         }
         val maxAllDay = days.maxOf { dayEvents[it]?.allDay?.size ?: 0 }.coerceAtMost(2)
         val allDayRowH = sz(13f)
@@ -63,59 +73,51 @@ object WeekBitmapRenderer {
         val hours = Dates.END_HOUR - Dates.START_HOUR
         val hourH = (h - top) / hours
 
-        // ---- 曜日ヘッダー ----
+        // ---- 曜日ヘッダー（英字の曜日＋セリフ体の日付。今日は銅色の斜体） ----
         days.forEachIndexed { i, d ->
             val k = Dates.kind(d)
             val x = axisW + colW * i
-            fill.color = Palette.headerBg(k)
-            cv.drawRect(x, 0f, x + colW, headerH, fill)
-            fill.color = Palette.accent(k)
-            cv.drawRect(x, headerH - dp(2f), x + colW, headerH, fill)
+            val isToday = d == today
             text.textAlign = Paint.Align.CENTER
-            text.typeface = Typeface.DEFAULT_BOLD
-            text.textSize = sz(9f)
-            text.color = Palette.text(k)
-            cv.drawText(Dates.dowJa(d), x + colW / 2, sz(10f), text)
-            text.textSize = sz(14f)
-            if (d == today) {
-                fill.color = Palette.TODAY
-                cv.drawCircle(x + colW / 2, sz(19.5f), sz(9f), fill)
-                text.color = 0xFFFFFFFF.toInt()
-            } else {
-                text.color = Palette.numText(k)
-            }
-            cv.drawText("${d.dayOfMonth}", x + colW / 2, sz(24.5f), text)
+            text.typeface = sans ?: Typeface.DEFAULT
+            text.textSize = sz(6.5f)
+            text.letterSpacing = 0.15f
+            text.color = if (isToday) Palette.COPPER else Palette.text(k)
+            cv.drawText(Dates.dowEn(d), x + colW / 2, sz(10f), text)
+            text.letterSpacing = 0f
+            serifPaint.typeface = if (isToday) (serifItalic ?: Typeface.create(Typeface.SERIF, Typeface.ITALIC)) else (serif ?: Typeface.SERIF)
+            serifPaint.textSize = sz(17f)
+            serifPaint.color = if (isToday) Palette.COPPER else Palette.numText(k)
+            cv.drawText("${d.dayOfMonth}", x + colW / 2, sz(25f), serifPaint)
         }
+        line.color = Palette.LINE
+        cv.drawLine(0f, headerH - dp(0.5f), w.toFloat(), headerH - dp(0.5f), line)
 
-        // ---- 時間帯の背景・罫線 ----
-        days.forEachIndexed { i, d ->
-            val x = axisW + colW * i
-            fill.color = Palette.tint(Dates.kind(d))
-            cv.drawRect(x, top, x + colW, h.toFloat(), fill)
+        // ---- 今日の列・罫線（細い実線） ----
+        val ti0 = days.indexOf(today)
+        if (ti0 >= 0) {
+            fill.color = Palette.TODAY_TINT
+            cv.drawRect(axisW + colW * ti0, top, axisW + colW * (ti0 + 1), h.toFloat(), fill)
         }
-        val dash = DashPathEffect(floatArrayOf(dp(4f), dp(3f)), 0f)
-        line.pathEffect = dash
         for (i in 0 until hours) {
             val half = top + hourH * i + hourH / 2
-            line.color = 0xFFEBE6DB.toInt()
+            line.color = 0x73E6E1DA // 30分の線（薄く）
             cv.drawLine(axisW, half, w.toFloat(), half, line)
             if (i == 0) continue
             val y = top + hourH * i
-            line.color = 0xFFD8D2C4.toInt()
+            line.color = Palette.LINE_SOFT
             cv.drawLine(axisW, y, w.toFloat(), y, line)
         }
-        line.pathEffect = null
-        line.color = Palette.LINE_SOFT
+        line.color = Palette.LINE
         cv.drawLine(0f, top, w.toFloat(), top, line)
 
         // ---- 時刻ラベル ----
-        text.textAlign = Paint.Align.CENTER
-        text.typeface = Typeface.DEFAULT
-        text.textSize = sz(10f)
-        text.color = 0xFF555555.toInt()
+        serifPaint.typeface = serif ?: Typeface.SERIF
+        serifPaint.textSize = sz(10.5f)
+        serifPaint.color = Palette.FAINT
         val step = if (hourH < sz(11f)) 2 else 1
         for (i in 0 until hours step step) {
-            cv.drawText("${Dates.START_HOUR + i}", axisW / 2, top + hourH * i + sz(10f), text)
+            cv.drawText("${Dates.START_HOUR + i}", axisW / 2, top + hourH * i + sz(10f), serifPaint)
         }
 
         // ---- 終日予定 ----
@@ -123,8 +125,13 @@ object WeekBitmapRenderer {
             val x = axisW + colW * i
             dayEvents[d]?.allDay?.take(2)?.forEachIndexed { j, ev ->
                 val y = headerH + dp(1.5f) + allDayRowH * j
-                val r = RectF(x + dp(1f), y, x + colW - dp(1f), y + allDayRowH - dp(1f))
-                drawEventBox(cv, r, ev.color, fill, ::dp)
+                val r = RectF(x + dp(1.5f), y, x + colW - dp(1.5f), y + allDayRowH - dp(1f))
+                // 終日予定は線で囲むだけ
+                line.color = Palette.LINE
+                line.style = Paint.Style.STROKE
+                cv.drawRoundRect(r, dp(1.5f), dp(1.5f), line)
+                line.style = Paint.Style.FILL_AND_STROKE
+                eventText.color = Palette.SUB
                 drawClipped(cv, ev.title, r, dp(1.5f), dp(3f), eventText, singleLine = true)
             }
         }
@@ -140,19 +147,29 @@ object WeekBitmapRenderer {
                 val y1 = top + hourH * t / 60f
                 val y2 = maxOf(top + hourH * b / 60f, y1 + sz(12f))
                 val r = RectF(x + cw * s.col + dp(1.5f), y1 + dp(1f), x + cw * (s.col + 1) - dp(1.5f), y2 - dp(1f))
-                drawEventBox(cv, r, s.event.color, fill, ::dp)
-                drawClipped(cv, s.event.title, r, dp(2f), dp(3f), eventText, singleLine = false)
+                if (s.event.taskId != null) {
+                    // 時刻付きタスク：点線の枠だけ
+                    line.color = Palette.FAINT
+                    line.style = Paint.Style.STROKE
+                    line.pathEffect = DashPathEffect(floatArrayOf(dp(3f), dp(2f)), 0f)
+                    cv.drawRoundRect(r, dp(1.5f), dp(1.5f), line)
+                    line.pathEffect = null
+                    line.style = Paint.Style.FILL_AND_STROKE
+                    eventText.color = Palette.SUB
+                } else {
+                    drawEventBox(cv, r, s.event.color, fill, ::dp)
+                    eventText.color = Palette.eventInk(s.event.color)
+                }
+                drawClipped(cv, s.event.title, r, dp(2f), dp(4f), eventText, singleLine = false)
             }
         }
 
-        // ---- 縦の区切り線（破線） ----
-        line.color = Palette.LINE
-        line.pathEffect = dash
+        // ---- 縦の区切り線（細い実線） ----
+        line.color = Palette.LINE_SOFT
         for (i in 0..6) {
             val x = axisW + colW * i
-            cv.drawLine(x, 0f, x, h.toFloat(), line)
+            cv.drawLine(x, headerH, x, h.toFloat(), line)
         }
-        line.pathEffect = null
 
         // ---- 現在時刻 ----
         val ti = days.indexOf(today)
@@ -160,20 +177,24 @@ object WeekBitmapRenderer {
         if (ti >= 0 && nowMin in Dates.START_MIN..Dates.END_MIN) {
             val y = top + hourH * (nowMin - Dates.START_MIN) / 60f
             val x = axisW + colW * ti
-            fill.color = Palette.TODAY
-            cv.drawRect(x, y - dp(0.75f), x + colW, y + dp(0.75f), fill)
-            cv.drawCircle(x + dp(2f), y, dp(2.5f), fill)
+            // 細い銅色の線と、左端に小さなひし形
+            fill.color = Palette.COPPER
+            cv.drawRect(x, y - dp(0.5f), x + colW, y + dp(0.5f), fill)
+            val dia = android.graphics.Path().apply {
+                moveTo(x, y - dp(3f)); lineTo(x + dp(3f), y); lineTo(x, y + dp(3f)); lineTo(x - dp(3f), y); close()
+            }
+            cv.drawPath(dia, fill)
         }
 
         return bmp
     }
 
-    /** 予定の箱：角丸・予定の色を薄くした背景・下側にうっすら影 */
+    /** 予定の箱：くすませた予定の色の背景＋左端に細い線（Greige & Copper） */
     private fun drawEventBox(cv: Canvas, r: RectF, color: Int, fill: Paint, dp: (Float) -> Float) {
-        fill.color = 0x22000000
-        cv.drawRoundRect(RectF(r.left, r.top + dp(0.8f), r.right, r.bottom + dp(0.8f)), dp(4f), dp(4f), fill)
         fill.color = Palette.eventBg(color)
-        cv.drawRoundRect(r, dp(4f), dp(4f), fill)
+        cv.drawRoundRect(r, dp(1.5f), dp(1.5f), fill)
+        fill.color = Palette.eventBar(color)
+        cv.drawRect(r.left, r.top, r.left + dp(1.5f), r.bottom, fill)
     }
 
     /** 矩形内に文字を折り返して描画（はみ出す分は切り捨て） */

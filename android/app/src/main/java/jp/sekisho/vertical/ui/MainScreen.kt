@@ -49,6 +49,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.layout.Arrangement
 import jp.sekisho.vertical.data.GoogleAuth
 import jp.sekisho.vertical.data.Task
 import kotlinx.coroutines.delay
@@ -111,7 +113,7 @@ fun MainScreen(vm: MainViewModel) {
     Scaffold(
         topBar = {
             TopBar(
-                title = if (vm.mode == ViewMode.WEEK) Dates.weekTitle(Dates.weekStart(vm.anchor)) else Dates.monthTitle(vm.anchor),
+                anchor = vm.anchor,
                 mode = vm.mode,
                 onPrev = { vm.move(-1) },
                 onNext = { vm.move(1) },
@@ -240,7 +242,7 @@ private fun Modifier.swipeToMove(onMove: (Int) -> Unit) = pointerInput(Unit) {
 
 @Composable
 private fun TopBar(
-    title: String,
+    anchor: LocalDate,
     mode: ViewMode,
     onPrev: () -> Unit,
     onNext: () -> Unit,
@@ -249,47 +251,55 @@ private fun TopBar(
     onSync: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    val ink = c(Palette.INK)
-    Column(Modifier.fillMaxWidth().background(c(Palette.BG)).statusBarsPadding()) {
-        Row(
-            Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    val months = arrayOf("JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER")
+    val ws = Dates.weekStart(anchor)
+    val we = ws.plusDays(6)
+    val weekNo = ws.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())
+    // 小さな英字の行：「WEEK 46 — NOVEMBER 2026」／月間は「2026」
+    val caption = if (mode == ViewMode.WEEK) "WEEK $weekNo — ${months[ws.monthValue - 1]} ${ws.year}" else "${anchor.year}"
+    Column(Modifier.fillMaxWidth().background(c(Palette.BG)).statusBarsPadding().padding(horizontal = 18.dp)) {
+        // 1行目：前・今日・次 ／ 同期・設定（控えめな文字）
+        Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
             BarButton("‹", onPrev)
-            BarButton("今日", onToday, wide = true)
+            BarButton("TODAY", onToday, wide = true)
             BarButton("›", onNext)
-            Text(
-                title,
-                color = ink,
-                fontSize = 16.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(start = 8.dp),
-            )
-            // 週間／月間の切り替え（グレーの台の上に白い選択中ボタン）
-            Row(Modifier.clip(RoundedCornerShape(9.dp)).background(Color(0xFFE2DED4)).padding(2.dp)) {
-                ViewMode.entries.forEach { m ->
-                    val active = m == mode
-                    Box(
-                        Modifier
-                            .let { if (active) it.shadow(1.dp, RoundedCornerShape(7.dp)) else it }
-                            .clip(RoundedCornerShape(7.dp))
-                            .background(if (active) Color.White else Color.Transparent)
-                            .clickable { onMode(m) }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                    ) {
-                        Text(
-                            if (m == ViewMode.WEEK) "週間" else "月間",
-                            fontSize = 13.sp,
-                            color = if (active) ink else Color(0xFF555555),
-                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.weight(1f))
             BarButton("⟳", onSync)
             BarButton("⚙", onSettings)
+        }
+        // 2行目：セリフ体の大きな見出し ／ WEEK・MONTH の切り替え（下線）
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Text(caption, fontSize = 9.5.sp, letterSpacing = 2.5.sp, color = c(Palette.SUB), fontWeight = FontWeight.Medium)
+                val serif = TextStyle(fontFamily = Fonts.Serif, fontFeatureSettings = Fonts.LINING, fontWeight = FontWeight.Medium, color = c(Palette.INK))
+                if (mode == ViewMode.WEEK) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("${ws.dayOfMonth}", style = serif, fontSize = 44.sp, lineHeight = 44.sp)
+                        Text(
+                            " to ", style = serif, fontSize = 22.sp, color = c(Palette.SUB),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, modifier = Modifier.padding(bottom = 5.dp),
+                        )
+                        Text("${we.dayOfMonth}", style = serif, fontSize = 44.sp, lineHeight = 44.sp)
+                    }
+                } else {
+                    Text(months[anchor.monthValue - 1].lowercase().replaceFirstChar { it.uppercase() }, style = serif, fontSize = 40.sp, lineHeight = 44.sp)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                ViewMode.entries.forEach { m ->
+                    val active = m == mode
+                    Text(
+                        if (m == ViewMode.WEEK) "WEEK" else "MONTH",
+                        fontSize = 11.sp,
+                        letterSpacing = 1.8.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (active) c(Palette.INK) else c(Palette.FAINT),
+                        modifier = Modifier.clickable { onMode(m) }
+                            .let { if (active) it.bottomLine(c(Palette.INK), 1f) else it }
+                            .padding(bottom = 3.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -297,10 +307,15 @@ private fun TopBar(
 @Composable
 private fun BarButton(label: String, onClick: () -> Unit, wide: Boolean = false) {
     Box(
-        Modifier.height(38.dp).let { if (wide) it.padding(horizontal = 2.dp) else it.size(38.dp) }
-            .clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = if (wide) 8.dp else 0.dp),
+        Modifier.height(36.dp).let { if (wide) it.padding(horizontal = 2.dp) else it.size(36.dp) }
+            .clip(RoundedCornerShape(4.dp)).clickable(onClick = onClick).padding(horizontal = if (wide) 8.dp else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = c(Palette.INK), fontSize = if (wide) 15.sp else 22.sp)
+        Text(
+            label, color = c(Palette.SUB),
+            fontSize = if (wide) 11.sp else 20.sp,
+            letterSpacing = if (wide) 1.8.sp else 0.sp,
+            fontWeight = if (wide) FontWeight.Medium else FontWeight.Light,
+        )
     }
 }

@@ -46,6 +46,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import jp.sekisho.vertical.MainActivity
 import jp.sekisho.vertical.R
+import androidx.core.content.res.ResourcesCompat
 import jp.sekisho.vertical.data.CalendarRepository
 import jp.sekisho.vertical.data.DataSignals
 import jp.sekisho.vertical.data.Dates
@@ -78,7 +79,7 @@ class WeekWidget : GlanceAppWidget() {
 private fun cp(argb: Int) = ColorProvider(Color(argb))
 
 /** タスク欄の罫線（薄く目立たない色） */
-private const val TASK_RULE = 0xFFEBE6DB.toInt()
+private const val TASK_RULE = Palette.LINE_SOFT
 
 @Composable
 private fun WidgetContent(version: Long, startToday: Boolean) {
@@ -114,11 +115,16 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
     // 画面の解像度どおりに描いて文字のぼやけを防ぐ（RGB_565 でメモリを節約）
     val scale = context.resources.displayMetrics.density.coerceAtMost(3.5f)
     val bitmap = remember(version, size, weekStart, today, now.hour, now.minute / 15) {
-        WeekBitmapRenderer.render(size.width.value, imageH.value, scale, days, dayEvents, today, now)
+        WeekBitmapRenderer.render(
+            size.width.value, imageH.value, scale, days, dayEvents, today, now,
+            serif = runCatching { ResourcesCompat.getFont(context, R.font.cormorant_medium) }.getOrNull(),
+            serifItalic = runCatching { ResourcesCompat.getFont(context, R.font.cormorant_medium_italic) }.getOrNull(),
+            sans = runCatching { ResourcesCompat.getFont(context, R.font.intertight_regular) }.getOrNull(),
+        )
     }
     val openApp = actionStartActivity<MainActivity>()
 
-    Column(GlanceModifier.fillMaxSize().cornerRadius(12.dp).background(cp(Palette.PAPER))) {
+    Column(GlanceModifier.fillMaxSize().cornerRadius(8.dp).background(cp(Palette.PAPER))) {
         // タイトル行
         Row(
             GlanceModifier.fillMaxWidth().height(titleH).background(cp(Palette.BG)).padding(horizontal = 10.dp),
@@ -135,7 +141,7 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
                 if (startToday) "⇄ 月曜から" else "⇄ 今日から",
                 style = TextStyle(color = cp(Palette.INK), fontSize = (11f * ts.coerceAtMost(1.3f)).sp),
                 modifier = GlanceModifier.padding(horizontal = 8.dp, vertical = 2.dp).cornerRadius(10.dp)
-                    .background(cp(0xFFE2DED4.toInt())).clickable(actionRunCallback<ToggleStartAction>()),
+                    .background(cp(Palette.LINE_SOFT)).clickable(actionRunCallback<ToggleStartAction>()),
             )
             Text(
                 "⟳",
@@ -162,9 +168,9 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
 
         // タスク（各日5件・チェックで削除）。行と日の間に目立たない罫線を引く
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(cp(Palette.LINE))) {}
-        Row(GlanceModifier.fillMaxWidth().height(tasksH)) {
+        Row(GlanceModifier.fillMaxWidth().height(tasksH).background(cp(Palette.TASKS_BG))) {
             Box(GlanceModifier.width(axisW).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("TASK", style = TextStyle(color = cp(Palette.SUB), fontSize = (7f * ts).sp), maxLines = 1)
+                Text("TASKS", style = TextStyle(color = cp(Palette.FAINT), fontSize = (6.5f * ts).sp), maxLines = 1)
             }
             days.forEach { d ->
               // Glance の Row は子要素10個までなので、罫線と1日分の列をまとめる
@@ -196,7 +202,7 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
                                 }
                                 Text(
                                     t.text,
-                                    style = TextStyle(color = cp(Palette.INK), fontSize = (10f * ts).sp, fontWeight = FontWeight.Medium),
+                                    style = TextStyle(color = cp(Palette.INK), fontSize = (10f * ts).sp, fontWeight = FontWeight.Normal),
                                     maxLines = 1,
                                     modifier = GlanceModifier.defaultWeight().clickable(openApp),
                                 )

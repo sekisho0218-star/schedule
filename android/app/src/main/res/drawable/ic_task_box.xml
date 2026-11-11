@@ -1,7 +1,8 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="12dp" android:height="12dp"
     android:viewportWidth="12" android:viewportHeight="12">
-    <path android:strokeColor="#777777" android:strokeWidth="1"
-        android:fillColor="#FFFFFF"
+    <!-- タスクのチェック欄（Greige & Copper：紙色に細い線） -->
+    <path android:strokeColor="#8F877E" android:strokeWidth="0.9"
+        android:fillColor="#F8F6F2"
         android:pathData="M1.5,1.5h9v9h-9z" />
 </vector>

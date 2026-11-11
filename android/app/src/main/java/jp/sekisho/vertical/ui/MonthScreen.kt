@@ -71,19 +71,19 @@ fun MonthScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .shadow(3.dp, RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .background(c(Palette.PAPER)),
+            .clip(RoundedCornerShape(6.dp))
+            .background(c(Palette.PAPER))
+            .border(1.dp, c(Palette.LINE), RoundedCornerShape(6.dp)),
     ) {
         Row(Modifier.fillMaxWidth()) {
             for (i in 0L until 7L) {
                 val d = start.plusDays(i)
                 val k = Dates.kind(d)
                 Box(
-                    Modifier.weight(1f).background(c(Palette.headerBg(k))).bottomLine(c(Palette.accent(k))).padding(vertical = 5.dp),
+                    Modifier.weight(1f).bottomLine(c(Palette.LINE), 1f).padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(Dates.dowJa(d), fontSize = ssp(12f), fontWeight = FontWeight.Bold, color = c(Palette.text(k)))
+                    Text(Dates.dowEn(d), fontSize = ssp(8.5f), letterSpacing = 1.5.sp, fontWeight = FontWeight.Medium, color = c(Palette.text(k)))
                 }
             }
         }
@@ -98,7 +98,7 @@ fun MonthScreen(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .background(c(Palette.tint(k)))
+                            .background(if (d == today) Color(Palette.TODAY_TINT) else Color.Transparent)
                             .leftLine(c(Palette.LINE_SOFT))
                             .topLine(c(Palette.LINE_SOFT))
                             .clickable { onDayClick(d) }
@@ -107,30 +107,33 @@ fun MonthScreen(
                         verticalArrangement = Arrangement.spacedBy(1.dp),
                     ) {
                         val isToday = d == today
-                        Box(
-                            Modifier.size(sdp(20f)).clip(CircleShape).background(if (isToday) c(Palette.TODAY) else Color.Transparent),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                "${d.dayOfMonth}",
-                                fontSize = ssp(12f),
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isToday) Color.White else c(Palette.numText(k)),
-                            )
-                        }
+                        // 日付はセリフ体。今日は銅色の斜体
+                        Text(
+                            "${d.dayOfMonth}",
+                            fontFamily = Fonts.Serif,
+                            fontStyle = if (isToday) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
+                            fontSize = ssp(17f),
+                            lineHeight = ssp(19f),
+                            fontWeight = FontWeight.Medium,
+                            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = Fonts.LINING),
+                            color = if (isToday) c(Palette.COPPER) else c(Palette.numText(k)),
+                            modifier = Modifier.padding(start = 2.dp),
+                        )
                         val items = de.allDay.map { it to true } + de.timed.map { it.event to false }
                         items.take(maxItems).forEach { (ev, allDay) ->
                             if (allDay) {
                                 Text(
-                                    ev.title, fontSize = ssp(10.5f), fontWeight = FontWeight.Medium, color = c(Palette.EVENT_TEXT),
+                                    ev.title, fontSize = ssp(9.5f), color = c(Palette.SUB),
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth().eventStyle(ev.color).padding(horizontal = 4.dp),
+                                    modifier = Modifier.fillMaxWidth().border(1.dp, c(Palette.LINE), RoundedCornerShape(2.dp)).padding(horizontal = 3.dp),
                                 )
                             } else {
                                 Text(
-                                    ev.title, fontSize = ssp(10.5f), color = c(Palette.EVENT_TEXT), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(5.dp))
-                                        .background(Color(Palette.eventBg(ev.color, 0.7f))).padding(horizontal = 4.dp),
+                                    ev.title, fontSize = ssp(10f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    color = if (ev.taskId != null) c(Palette.SUB) else Color(Palette.eventInk(ev.color)),
+                                    modifier = Modifier.fillMaxWidth()
+                                        .let { m -> if (ev.taskId != null) m.taskStyle() else m.eventStyle(ev.color) }
+                                        .padding(start = 4.dp, end = 2.dp),
                                 )
                             }
                         }
@@ -138,7 +141,7 @@ fun MonthScreen(
                         val n = perDay.getValue(d).second.size
                         if (n > 0) {
                             Spacer(Modifier.weight(1f))
-                            Text("☐ $n", fontSize = ssp(9f), color = c(Palette.INK))
+                            Text("☐ $n", fontSize = ssp(9f), color = c(Palette.SUB))
                         }
                     }
                 }

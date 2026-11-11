@@ -1,46 +1,66 @@
 package jp.sekisho.vertical.ui
 
+import androidx.core.graphics.ColorUtils
 import jp.sekisho.vertical.data.DayKind
 
-/** 手帳の配色（アプリ画面とウィジェットで共通。ARGB） */
+/**
+ * 配色「Greige & Copper」（アプリ画面とウィジェットで共通。ARGB）
+ * グレージュの紙に、くすんだ銅色のアクセント。予定はカレンダーの色をくすませて表示する。
+ */
 object Palette {
-    const val INK = 0xFF2B2B2B.toInt()
-    const val SUB = 0xFF777777.toInt()
-    const val LINE = 0xFFD9D4C7.toInt()
-    const val LINE_SOFT = 0xFFECE8DD.toInt()
-    const val PAPER = 0xFFFFFDF7.toInt()
-    const val BG = 0xFFF1EEE6.toInt()
-    const val BAR = 0xFF3A3A3A.toInt()
-    const val TODAY = 0xFFFF8A00.toInt()
-    const val PLACEHOLDER = 0xFFC5BFAE.toInt()
+    const val INK = 0xFF2B2825.toInt()       // 文字
+    const val SUB = 0xFF8F877E.toInt()       // 補助の文字
+    const val FAINT = 0xFFB9B1A7.toInt()     // さらに薄い文字（時刻・＋）
+    const val LINE = 0xFFDCD7CF.toInt()      // 枠・区切り
+    const val LINE_SOFT = 0xFFE6E1DA.toInt() // 罫線
+    const val PAPER = 0xFFF8F6F2.toInt()     // 手帳の紙
+    const val PAPER2 = 0xFFF3F0EB.toInt()    // 紙（下側）
+    const val BG = 0xFFECE9E4.toInt()        // 画面の背景
+    const val TASKS_BG = 0xFFF1EDE7.toInt()  // タスク欄
+    const val BAR = INK
+    const val COPPER = 0xFFA8693F.toInt()    // アクセント（今日・今の時刻）
+    const val TODAY = COPPER
+    const val TODAY_TINT = 0x14A8693F        // 今日の列（銅色 8%）
+    const val PLACEHOLDER = FAINT
 
-    // 平日＝黄 / 土曜＝青 / 日曜＝赤
-    const val WEEKDAY = 0xFFF2C230.toInt()
-    const val WEEKDAY_BG = 0xFFFFF8DC.toInt()
-    const val WEEKDAY_TEXT = 0xFF9A7600.toInt()
-    const val WEEKDAY_TINT = 0xFFFFFCEF.toInt()
-    const val SAT = 0xFF3D7FD9.toInt()
-    const val SAT_BG = 0xFFE9F1FC.toInt()
-    const val SAT_TINT = 0xFFF2F6FC.toInt()
-    const val SUN = 0xFFE0473D.toInt()
-    const val SUN_BG = 0xFFFDECEA.toInt()
-    const val SUN_TINT = 0xFFFDF3F1.toInt()
+    // 土曜・日曜はくすんだ青・赤の日付
+    const val SAT = 0xFF6F7F92.toInt()
+    const val SUN = 0xFFA2625A.toInt()
 
-    /** 予定ブロックの文字色（薄い背景の上で読みやすい濃い色） */
-    const val EVENT_TEXT = 0xFF1A1A1A.toInt()
+    // 以前の名前（互換用）：曜日の色分けは日付の文字色だけにした
+    const val WEEKDAY = LINE
+    const val WEEKDAY_BG = PAPER
+    const val WEEKDAY_TEXT = SUB
+    const val WEEKDAY_TINT = PAPER
+    const val SAT_BG = PAPER
+    const val SAT_TINT = PAPER
+    const val SUN_BG = PAPER
+    const val SUN_TINT = PAPER
 
-    /** 予定の色を白に寄せた背景色（ratio = 白の割合） */
-    fun eventBg(color: Int, ratio: Float = 0.5f): Int {
-        fun ch(shift: Int): Int {
-            val v = (color shr shift) and 0xFF
-            return (v + (255 - v) * ratio).toInt().coerceIn(0, 255)
-        }
-        return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+    /** 予定ブロックの文字色（色が分からないとき） */
+    const val EVENT_TEXT = 0xFF2F2C29.toInt()
+
+    private fun tone(color: Int, satScale: Float, lightness: Float): Int {
+        val hsl = FloatArray(3)
+        ColorUtils.colorToHSL(color or 0xFF000000.toInt(), hsl)
+        hsl[1] = (hsl[1] * satScale).coerceIn(0f, 1f)
+        hsl[2] = lightness
+        return ColorUtils.HSLToColor(hsl)
     }
 
-    fun accent(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY; DayKind.SATURDAY -> SAT; DayKind.SUNDAY -> SUN }
-    fun headerBg(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY_BG; DayKind.SATURDAY -> SAT_BG; DayKind.SUNDAY -> SUN_BG }
-    fun text(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY_TEXT; DayKind.SATURDAY -> SAT; DayKind.SUNDAY -> SUN }
+    /** 予定の背景：カレンダーの色をくすませて明るくした色（ratio は互換用） */
+    @Suppress("UNUSED_PARAMETER")
+    fun eventBg(color: Int, ratio: Float = 0.5f): Int = tone(color, 0.30f, 0.895f)
+
+    /** 予定の左端の線：カレンダーの色をくすませた色 */
+    fun eventBar(color: Int): Int = tone(color, 0.38f, 0.50f)
+
+    /** 予定の文字：カレンダーの色を含んだ濃い色 */
+    fun eventInk(color: Int): Int = tone(color, 0.30f, 0.21f)
+
+    fun accent(k: DayKind) = LINE
+    fun headerBg(k: DayKind) = PAPER
+    fun text(k: DayKind) = when (k) { DayKind.WEEKDAY -> SUB; DayKind.SATURDAY -> SAT; DayKind.SUNDAY -> SUN }
     fun numText(k: DayKind) = when (k) { DayKind.WEEKDAY -> INK; DayKind.SATURDAY -> SAT; DayKind.SUNDAY -> SUN }
-    fun tint(k: DayKind) = when (k) { DayKind.WEEKDAY -> WEEKDAY_TINT; DayKind.SATURDAY -> SAT_TINT; DayKind.SUNDAY -> SUN_TINT }
+    fun tint(k: DayKind) = PAPER
 }

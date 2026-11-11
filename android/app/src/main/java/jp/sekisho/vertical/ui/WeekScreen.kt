@@ -41,7 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.geometry.Offset
@@ -114,13 +114,13 @@ fun WeekScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .shadow(3.dp, RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .background(c(Palette.PAPER)),
+            .clip(RoundedCornerShape(6.dp))
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c(Palette.PAPER), c(Palette.PAPER2))))
+            .border(1.dp, c(Palette.LINE), RoundedCornerShape(6.dp)),
     ) {
         // 曜日ヘッダー
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(Modifier.width(AXIS_W).fillMaxHeight().bottomLine(c(Palette.LINE_SOFT)))
+            Box(Modifier.width(AXIS_W).fillMaxHeight().bottomLine(c(Palette.LINE), 1f))
             days.forEach { d ->
                 DayHeader(d, d == today, Modifier.weight(1f).clickable { onAddEvent(d, null) })
             }
@@ -128,7 +128,7 @@ fun WeekScreen(
         // 終日予定
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(Modifier.width(AXIS_W).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("終日", fontSize = ssp(10f), color = c(Palette.SUB))
+                Text("ALL", fontSize = ssp(7f), color = c(Palette.FAINT), letterSpacing = 1.5.sp)
             }
             days.forEach { d ->
                 Column(
@@ -139,14 +139,14 @@ fun WeekScreen(
                     list.take(3).forEach { ev ->
                         Text(
                             ev.title,
-                            fontSize = ssp(11f),
-                            fontWeight = FontWeight.Medium,
-                            color = c(Palette.EVENT_TEXT),
+                            fontSize = ssp(9.5f),
+                            color = c(Palette.SUB),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth()
-                                .eventStyle(ev.color).clickable { onItemClick(ev) }
-                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                                .border(1.dp, c(Palette.LINE), RoundedCornerShape(2.dp))
+                                .clickable { onItemClick(ev) }
+                                .padding(horizontal = 4.dp, vertical = 1.dp),
                         )
                     }
                     if (list.size > 3) Text("+${list.size - 3}", fontSize = ssp(8f), color = c(Palette.SUB))
@@ -159,7 +159,7 @@ fun WeekScreen(
             val tasksH = TASK_ROW_H * TaskRepository.PER_DAY + 8.dp
             val hourH = ((maxHeight - tasksH) / HOURS).coerceAtLeast(30.dp)
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Row(Modifier.fillMaxWidth().topLine(c(Palette.LINE_SOFT))) {
+                Row(Modifier.fillMaxWidth().topLine(c(Palette.LINE))) {
                     TimeAxis(hourH)
                     days.forEach { d ->
                         DayTimeline(
@@ -173,9 +173,9 @@ fun WeekScreen(
                         )
                     }
                 }
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).topLine(c(Palette.LINE))) {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(c(Palette.TASKS_BG)).topLine(c(Palette.LINE))) {
                     Box(Modifier.width(AXIS_W).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        Text("TASK", fontSize = ssp(9f), color = c(Palette.SUB))
+                        Text("TASKS", fontSize = ssp(7f), color = c(Palette.FAINT), letterSpacing = 1.5.sp)
                     }
                     days.forEach { d ->
                         // 同期のたびに入力欄を作り直さない（作り直すと入力途中の文字が追加されることがあった）
@@ -200,21 +200,26 @@ fun WeekScreen(
 private fun DayHeader(d: LocalDate, isToday: Boolean, modifier: Modifier) {
     val k = Dates.kind(d)
     Column(
-        modifier.background(c(Palette.headerBg(k))).leftDashed().bottomLine(c(Palette.accent(k))).padding(top = 6.dp, bottom = 6.dp),
+        modifier.bottomLine(c(Palette.LINE), 1f).padding(top = 8.dp, bottom = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(Dates.dowJa(d), fontSize = ssp(11f), fontWeight = FontWeight.Medium, color = c(Palette.text(k)))
-        Box(
-            Modifier.padding(top = 2.dp).size(sdp(30f)).clip(CircleShape).background(if (isToday) c(Palette.TODAY) else Color.Transparent),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "${d.dayOfMonth}",
-                fontSize = ssp(18f),
-                fontWeight = FontWeight.Medium,
-                color = if (isToday) Color.White else c(Palette.numText(k)),
-            )
-        }
+        Text(
+            Dates.dowEn(d), fontSize = ssp(8f), letterSpacing = 1.5.sp,
+            fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (isToday) c(Palette.COPPER) else c(Palette.text(k)),
+        )
+        // 日付はセリフ体。今日は銅色の斜体
+        Text(
+            "${d.dayOfMonth}",
+            fontFamily = Fonts.Serif,
+            fontStyle = if (isToday) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
+            fontSize = ssp(24f),
+            lineHeight = ssp(26f),
+            fontWeight = FontWeight.Medium,
+            style = TextStyle(fontFeatureSettings = Fonts.LINING),
+            color = if (isToday) c(Palette.COPPER) else c(Palette.numText(k)),
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }
 
@@ -224,10 +229,12 @@ private fun TimeAxis(hourH: Dp) {
         for (i in 0 until HOURS) {
             Text(
                 "${Dates.START_HOUR + i}",
-                fontSize = ssp(12f),
-                color = c(0xFF555555.toInt()),
-                modifier = Modifier.offset(y = hourH * i).width(AXIS_W).padding(top = 2.dp),
-                style = TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                fontSize = ssp(13f),
+                fontFamily = Fonts.Serif,
+                fontWeight = FontWeight.Medium,
+                color = c(Palette.FAINT),
+                modifier = Modifier.offset(y = hourH * i).width(AXIS_W).padding(top = 1.dp),
+                style = TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontFeatureSettings = Fonts.LINING),
             )
         }
     }
@@ -244,21 +251,21 @@ private fun DayTimeline(
     modifier: Modifier,
 ) {
     val k = Dates.kind(date)
-    val lineSoft = Color(0xFFD8D2C4)
-    val half = Color(0xFFEBE6DB)
+    val lineSoft = c(Palette.LINE_SOFT)
+    val half = c(Palette.LINE_SOFT).copy(alpha = 0.45f)
+    val isToday = nowMin != null
     BoxWithConstraints(
         modifier
             .height(hourH * HOURS)
-            .background(c(Palette.tint(k)))
+            .background(if (isToday) Color(Palette.TODAY_TINT) else Color.Transparent)
             .drawBehind {
                 val h = hourH.toPx()
-                val dash = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))
                 for (i in 1 until HOURS) {
-                    drawLine(lineSoft, Offset(0f, h * i), Offset(size.width, h * i), 1.dp.toPx(), pathEffect = dash)
+                    drawLine(lineSoft, Offset(0f, h * i), Offset(size.width, h * i), 1.dp.toPx())
                 }
                 for (i in 0 until HOURS) {
                     val y = h * i + h / 2
-                    drawLine(half, Offset(0f, y), Offset(size.width, y), 1.dp.toPx(), pathEffect = dash)
+                    drawLine(half, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
                 }
             }
             .leftDashed()
@@ -285,16 +292,16 @@ private fun DayTimeline(
                     .width(colW / s.ncols)
                     .height(h)
                     .padding(horizontal = 2.dp, vertical = 1.dp)
-                    .eventStyle(s.event.color)
+                    .let { if (s.event.taskId != null) it.taskStyle() else it.eventStyle(s.event.color) }
                     .clickable { onEventClick(s.event) }
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                    .padding(start = 5.dp, end = 3.dp, top = 2.dp, bottom = 2.dp),
             ) {
                 Text(
                     s.event.title,
                     fontSize = ssp(11f),
                     lineHeight = ssp(13f),
-                    color = c(Palette.EVENT_TEXT),
-                    fontWeight = FontWeight.Medium,
+                    color = if (s.event.taskId != null) c(Palette.SUB) else Color(Palette.eventInk(s.event.color)),
+                    fontWeight = FontWeight.Normal,
                     maxLines = maxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -302,8 +309,8 @@ private fun DayTimeline(
         }
         if (nowMin != null && nowMin in Dates.START_MIN..Dates.END_MIN) {
             val y = hourH * (nowMin - Dates.START_MIN) / 60
-            Box(Modifier.offset(y = y - 1.dp).fillMaxWidth().height(2.dp).background(c(Palette.TODAY)))
-            Box(Modifier.offset(x = (-3).dp, y = y - 4.dp).size(8.dp).clip(CircleShape).background(c(Palette.TODAY)))
+            Box(Modifier.offset(y = y - 0.5.dp).fillMaxWidth().height(1.dp).background(c(Palette.COPPER)))
+            Box(Modifier.offset(x = (-3).dp, y = y - 3.dp).size(6.dp).graphicsLayer { rotationZ = 45f }.background(c(Palette.COPPER)))
         }
     }
 }
@@ -317,7 +324,7 @@ private fun TaskCell(
     onEdit: (Task) -> Unit,
     modifier: Modifier,
 ) {
-    val rule = Color(0xFFEBE6DB)
+    val rule = c(Palette.LINE_SOFT)
     Column(modifier.fillMaxHeight().leftDashed().padding(horizontal = 4.dp)) {
         for (i in 0 until TaskRepository.PER_DAY) {
             val t = tasks.getOrNull(i)
@@ -354,7 +361,7 @@ private fun TaskRow(task: Task, modifier: Modifier, onComplete: () -> Unit, onEd
             contentAlignment = Alignment.Center,
         ) {
             Box(
-                Modifier.size(sdp(12f)).border(1.dp, c(Palette.INK), RoundedCornerShape(2.dp)),
+                Modifier.size(sdp(11f)).background(c(Palette.PAPER)).border(1.dp, c(Palette.SUB), RoundedCornerShape(1.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (checked) Text("✓", fontSize = ssp(8f), lineHeight = ssp(8f), color = c(Palette.INK))
@@ -363,7 +370,7 @@ private fun TaskRow(task: Task, modifier: Modifier, onComplete: () -> Unit, onEd
         Text(
             task.text,
             fontSize = ssp(11f),
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.Light,
             color = c(Palette.INK),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -381,7 +388,7 @@ private fun EmptyTaskRow(modifier: Modifier, onAdd: (String) -> Unit) {
         value = text,
         onValueChange = { text = it },
         singleLine = true,
-        textStyle = TextStyle(fontSize = ssp(11f), color = c(Palette.INK)),
+        textStyle = TextStyle(fontSize = ssp(11f), color = c(Palette.INK), fontFamily = Fonts.Sans, fontWeight = FontWeight.Light),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         // 追加は確定（Enter）を押したときだけ。欄から離れただけでは追加しない
         // （日本語入力では欄を空にした直後に入力中の文字が送り直されることがあり、二重に追加される原因になっていた）
@@ -394,7 +401,7 @@ private fun EmptyTaskRow(modifier: Modifier, onAdd: (String) -> Unit) {
         modifier = modifier,
         decorationBox = { inner ->
             Box(Modifier.fillMaxSize().padding(start = 2.dp), contentAlignment = Alignment.CenterStart) {
-                if (text.isEmpty()) Text("+", fontSize = ssp(15f), color = c(0xFF9D9686.toInt()))
+                if (text.isEmpty()) Text("+", fontSize = ssp(13f), color = c(Palette.FAINT), fontWeight = FontWeight.Light)
                 inner()
             }
         },

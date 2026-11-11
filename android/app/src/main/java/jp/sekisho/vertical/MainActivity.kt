@@ -13,7 +13,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import jp.sekisho.vertical.data.Prefs
 import jp.sekisho.vertical.shift.ShiftWorker
+import jp.sekisho.vertical.ui.Fonts
 import jp.sekisho.vertical.ui.MainScreen
+import androidx.compose.ui.unit.dp
 import jp.sekisho.vertical.ui.MainViewModel
 import jp.sekisho.vertical.ui.Palette
 import jp.sekisho.vertical.ui.c
@@ -37,10 +39,22 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = lightColorScheme(
-                    primary = c(Palette.BAR),
-                    secondary = c(Palette.WEEKDAY),
+                    primary = c(Palette.COPPER),
+                    onPrimary = c(Palette.PAPER),
+                    secondary = c(Palette.SUB),
                     background = c(Palette.BG),
                     surface = c(Palette.PAPER),
+                    surfaceContainerHigh = c(Palette.PAPER),
+                    onSurface = c(Palette.INK),
+                    outline = c(Palette.LINE),
+                ),
+                typography = Fonts.typography(),
+                shapes = androidx.compose.material3.Shapes(
+                    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(2.dp),
+                    small = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                    medium = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                    large = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                 ),
             ) {
                 MainScreen(vm)
