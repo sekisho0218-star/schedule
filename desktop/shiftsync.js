@@ -144,8 +144,18 @@ async function compare(settings, today = new Date()) {
   /* ---- 授業以外：シフト表にあってカレンダーにないもの ---- */
   const proposals = [];
   for (const o of others) {
-    const exists = events.some((e) => onDate(e, o.date) && noSpace(e.title) === noSpace(o.title));
-    if (exists) continue;
+    const same = events.filter((e) => onDate(e, o.date) && noSpace(e.title) === noSpace(o.title));
+    if (same.length) {
+      // 懇談（「〜様」）は45分：開始が同じで長さだけ違う予定は、長さの変更を提案する
+      const e = same[0];
+      if (!o.allDay && !e.allDay && e.writable && same.length === 1 && /様/.test(o.title)
+        && minOfDay(e.start) === o.start && minOfDay(e.end) !== o.end) {
+        proposals.push({ key: `upd|${e.eventId}|${o.start}-${o.end}`, type: 'update', checked: true,
+          calendarId: e.calendarId, eventId: e.eventId, item: { ...o, title: e.title }, note: e.description || '',
+          desc: `${dayLabel(o.date)} ${hm(minOfDay(e.start))}–${hm(minOfDay(e.end))} ${e.title} → ${hm(o.start)}–${hm(o.end)}` });
+      }
+      continue;
+    }
     const when = o.allDay ? '終日' : `${hm(o.start)}–${hm(o.end)}`;
     proposals.push({ key: `add|${ymd(o.date)}|${o.allDay ? 'allday' : o.start}|${noSpace(o.title)}`, type: 'add', checked: true,
       calendarId: calId, item: o, desc: `${dayLabel(o.date)} ${when} ${o.title}` });
@@ -174,6 +184,7 @@ async function applyLessonOp(op) {
 
 async function applyProposal(p) {
   if (p.type === 'add') return google.createShiftEvent(p.calendarId, toEvent(p.item), 'other');
+  if (p.type === 'update') return google.updateShiftEvent(p.calendarId, p.eventId, toEvent(p.item), 'other', p.note);
   if (p.type === 'remove') return google.deleteEvent({ calendarId: p.calendarId, eventId: p.eventId });
   return null;
 }

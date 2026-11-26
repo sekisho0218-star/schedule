@@ -516,7 +516,7 @@ fun ShiftDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) { Tag(op.op); Text(op.desc, fontSize = 12.sp) }
                     }
                 }
-                val adds = pending.proposals.filter { it.type == "add" }
+                val adds = pending.proposals.filter { it.type == "add" || it.type == "update" }
                 val rms = pending.proposals.filter { it.type == "remove" }
                 @Composable
                 fun Item(p: ShiftSync.Proposal) = Row(

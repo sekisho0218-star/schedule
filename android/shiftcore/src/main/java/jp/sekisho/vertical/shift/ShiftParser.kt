@@ -296,6 +296,9 @@ object ShiftParser {
 
     private fun hm(h: Int, m: Int) = h * 60 + m
 
+    /** 授業以外の長さ（分）：「〜様」は懇談なので45分、それ以外は60分 */
+    private fun otherMinutes(title: String) = if (title.contains("様")) 45 else 60
+
     /** 授業の時間割：シフト表の時刻欄 → 終了時刻 */
     private val SLOT_END = mapOf(hm(16, 5) to hm(17, 30), hm(17, 35) to hm(19, 0), hm(19, 5) to hm(20, 30), hm(20, 35) to hm(22, 0))
 
@@ -342,7 +345,7 @@ object ShiftParser {
                     for ((t0, title) in slot.others) {
                         val t = t0 ?: minutes(label)
                         if (t == null) { notes += "$date $title"; continue }
-                        others += Other(date, t, t + 60, title, false)
+                        others += Other(date, t, minOf(t + otherMinutes(title), 24 * 60), title, false)
                     }
                     var elem = false
                     val title: String? = when {
@@ -373,7 +376,7 @@ object ShiftParser {
                     val (start, end) = lessonTime(labelStart ?: slot.override!!, slot.override, date, elem)
                     // 授業ではない書き込み（「ダスキン見積もり」など）は、確認してから反映する「授業以外」
                     if (freeOnly && !COURSE_RE.containsMatchIn(title)) {
-                        others += Other(date, start, minOf(start + 60, 24 * 60), title, false)
+                        others += Other(date, start, minOf(start + otherMinutes(title), 24 * 60), title, false)
                         continue
                     }
                     lessons += Lesson(date, start, minOf(end, 24 * 60), title)

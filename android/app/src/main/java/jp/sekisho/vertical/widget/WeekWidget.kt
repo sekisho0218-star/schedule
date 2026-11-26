@@ -42,6 +42,7 @@ import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import jp.sekisho.vertical.MainActivity
@@ -108,7 +109,8 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
     // 広い画面（Galaxy Z Fold の内側画面など）では文字と行を大きくする
     val ts = WeekBitmapRenderer.textScale(size.width.value)
     val titleH = (28f * ts.coerceAtMost(1.3f)).dp
-    val rowH = (19f * ts).dp
+    // タスクは2行まで折り返して読めるように、行を高めにとる
+    val rowH = (27f * ts).dp
     val axisW = WeekBitmapRenderer.axisDp(size.width.value).dp
     val tasksH = rowH * TaskRepository.PER_DAY + (TaskRepository.PER_DAY - 1).dp
     val imageH = (size.height - titleH - tasksH).coerceAtLeast(60.dp)
@@ -170,7 +172,7 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
         Box(GlanceModifier.fillMaxWidth().height(1.dp).background(cp(Palette.LINE))) {}
         Row(GlanceModifier.fillMaxWidth().height(tasksH).background(cp(Palette.TASKS_BG))) {
             Box(GlanceModifier.width(axisW).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                Text("TASKS", style = TextStyle(color = cp(Palette.FAINT), fontSize = (6.5f * ts).sp), maxLines = 1)
+                Text("タ\nス\nク", style = TextStyle(color = cp(Palette.SUB), fontSize = (8f * ts).sp, textAlign = TextAlign.Center), maxLines = 3)
             }
             days.forEach { d ->
               // Glance の Row は子要素10個までなので、罫線と1日分の列をまとめる
@@ -187,7 +189,7 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
                         ) {
                             if (t != null) {
                                 Box(
-                                    GlanceModifier.size(rowH).clickable(
+                                    GlanceModifier.width((17f * ts).dp).fillMaxHeight().clickable(
                                         actionRunCallback<CompleteTaskAction>(
                                             actionParametersOf(KeyDate to d.toString(), KeyTaskId to t.id),
                                         ),
@@ -202,8 +204,8 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
                                 }
                                 Text(
                                     t.text,
-                                    style = TextStyle(color = cp(Palette.INK), fontSize = (10f * ts).sp, fontWeight = FontWeight.Normal),
-                                    maxLines = 1,
+                                    style = TextStyle(color = cp(Palette.INK), fontSize = (10f * ts).sp, fontWeight = FontWeight.Medium),
+                                    maxLines = 2,
                                     modifier = GlanceModifier.defaultWeight().clickable(openApp),
                                 )
                             } else {

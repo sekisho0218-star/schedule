@@ -181,6 +181,8 @@ function readSlot(cells, roster) {
 }
 
 const hm2m = (h, m) => h * 60 + m;
+/** 授業以外の長さ（分）：「〜様」は懇談なので45分、それ以外は60分 */
+const otherMinutes = (title) => (/様/.test(title) ? 45 : 60);
 /** 授業の時間割：シフト表の時刻欄 → 終了時刻 */
 const SLOT_END = { [hm2m(16, 5)]: hm2m(17, 30), [hm2m(17, 35)]: hm2m(19, 0), [hm2m(19, 5)]: hm2m(20, 30), [hm2m(20, 35)]: hm2m(22, 0) };
 
@@ -235,7 +237,7 @@ function extractTeacher(grid, teacher, roster, today = new Date()) {
         for (const o of slot.others) {
           const t = o.time ?? minutes(label);
           if (t == null) { notes.push({ date, text: o.title }); continue; }
-          others.push({ date, start: t, end: t + 60, title: o.title });
+          others.push({ date, start: t, end: Math.min(t + otherMinutes(o.title), 24 * 60), title: o.title });
         }
 
         let title = null; let elem = false;
@@ -266,7 +268,7 @@ function extractTeacher(grid, teacher, roster, today = new Date()) {
         const { start, end } = lessonTime(labelStart ?? slot.override, slot.override, date, elem);
         // 授業ではない書き込み（「ダスキン見積もり」など）は、確認してから反映する「授業以外」
         if (freeOnly && !COURSE_RE.test(title)) {
-          others.push({ date, start, end: Math.min(start + 60, 24 * 60), title });
+          others.push({ date, start, end: Math.min(start + otherMinutes(title), 24 * 60), title });
           continue;
         }
         lessons.push({ date, start, end: Math.min(end, 24 * 60), title });

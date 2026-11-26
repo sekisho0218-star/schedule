@@ -654,7 +654,7 @@ function showShiftResult(r) {
     ? sec('授業の変更（初回のみ確認。以後は自動で反映）',
       `<label><input type="checkbox" id="shift-apply-lessons" checked> 次の${r.lessonOps.length}件を反映し、今後は授業を自動で反映する</label>`
       + r.lessonOps.map((o) => `<div><span class="tag ${o.op}">${OP_LABEL[o.op]}</span>${esc(o.desc)}</div>`).join('')) : '';
-  const adds = r.proposals.filter((p) => p.type === 'add');
+  const adds = r.proposals.filter((p) => p.type === 'add' || p.type === 'update');
   const rms = r.proposals.filter((p) => p.type === 'remove');
   const item = (p) => `<label><input type="checkbox" data-key="${esc(p.key)}" ${p.checked ? 'checked' : ''}><span><span class="tag ${p.type}">${OP_LABEL[p.type]}</span>${esc(p.desc)}</span></label>`;
   $('#shift-proposals').innerHTML = (adds.length ? sec('授業以外は反映しますか？（シフト表にあってカレンダーにない予定）', adds.map(item).join('')) : '')

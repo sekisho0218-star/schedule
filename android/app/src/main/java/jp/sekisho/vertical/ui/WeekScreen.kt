@@ -71,7 +71,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 private val AXIS_W: Dp @Composable get() = sdp(26f)
-private val TASK_ROW_H: Dp @Composable get() = sdp(24f)
+private val TASK_ROW_H: Dp @Composable get() = sdp(30f)
 private val HOURS = Dates.END_HOUR - Dates.START_HOUR
 
 @Composable
@@ -377,10 +377,11 @@ private fun TaskRow(task: Task, modifier: Modifier, onComplete: () -> Unit, onEd
         }
         Text(
             task.text,
-            fontSize = ssp(11f),
-            fontWeight = FontWeight.Light,
+            fontSize = ssp(10.5f),
+            lineHeight = ssp(12.5f),
+            fontWeight = FontWeight.Normal,
             color = c(Palette.INK),
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textDecoration = if (checked) TextDecoration.LineThrough else null,
             modifier = Modifier.weight(1f).clickable { onEdit() },

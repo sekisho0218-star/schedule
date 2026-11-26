@@ -274,8 +274,18 @@ class ShiftSync(context: Context) {
         /* ---- 授業以外：シフト表にあってカレンダーにないもの ---- */
         val proposals = mutableListOf<Proposal>()
         for (o in others) {
-            val exists = events.any { localDate(it) == o.date && ShiftParser.noSpace(it.title) == ShiftParser.noSpace(o.title) }
-            if (exists) continue
+            val same = events.filter { localDate(it) == o.date && ShiftParser.noSpace(it.title) == ShiftParser.noSpace(o.title) }
+            if (same.isNotEmpty()) {
+                // 懇談（「〜様」）は45分：開始が同じで長さだけ違う予定は、長さの変更を提案する
+                val e = same[0]
+                if (!o.allDay && !e.allDay && same.size == 1 && e.calendarId in writable && o.title.contains("様") &&
+                    minOfDay(e.begin) == o.start && minOfDay(e.end) != o.end) {
+                    proposals += Proposal("upd|${e.eventId}|${o.start}-${o.end}", "update",
+                        "${dayLabel(o.date)} ${hm(minOfDay(e.begin))}–${hm(minOfDay(e.end))} ${e.title} → ${hm(o.start)}–${hm(o.end)}", true,
+                        Op("update", "", e.calendarId, o.date, o.start, o.end, e.title, false, e.eventId, e.begin, e.series, e.description))
+                }
+                continue
+            }
             val whenText = if (o.allDay) "終日" else "${hm(o.start)}–${hm(o.end)}"
             val key = "add|${o.date}|${if (o.allDay) "allday" else o.start}|${ShiftParser.noSpace(o.title)}"
             proposals += Proposal(key, "add", "${dayLabel(o.date)} $whenText ${o.title}", true,
