@@ -1,7 +1,5 @@
 package jp.sekisho.vertical
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,9 +28,7 @@ class MainActivity : ComponentActivity() {
         // 明るい上部バーに合わせて、ステータスバーのアイコンを濃い色にする
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Palette.BG, Palette.BG))
 
-        val ids = AppWidgetManager.getInstance(this)
-            .getAppWidgetIds(ComponentName(this, WeekWidgetReceiver::class.java))
-        if (ids.isNotEmpty()) WidgetUpdater.schedule(this)
+        if (WeekWidgetReceiver.hasAnyWidget(this)) WidgetUpdater.schedule(this)
         if (Prefs(this).shiftEnabled) ShiftWorker.schedule(this)
         handleIntent(intent)
 
