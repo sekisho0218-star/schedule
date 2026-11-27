@@ -206,13 +206,18 @@ object WeekBitmapRenderer {
         cv.clipRect(r)
         val maxW = r.width() - padLeft - pad
         if (maxW <= 0) { cv.restore(); return }
+        // 枠が低いとき（ウィジェットが低い・短い予定）は、1行が枠に収まるまで文字を小さくする
+        val baseSize = p.textSize
+        val avail = r.height() - pad
+        val full = p.fontMetrics.let { it.descent - it.ascent }
+        if (full > avail && avail > 0) p.textSize = baseSize * maxOf(0.5f, avail / full)
         val fm = p.fontMetrics
         val lineH = (fm.descent - fm.ascent) * 0.95f
         var y = r.top + pad - fm.ascent
         var rest = s
         var first = true
-        // 1行目は必ず描き、2行目以降は矩形に収まる範囲だけ描く
-        while (rest.isNotEmpty() && (first || y + fm.descent <= r.bottom + lineH * 0.3f)) {
+        // 1行目は必ず描き、2行目以降は枠に収まる行だけ描く（行の途中で切れないように）
+        while (rest.isNotEmpty() && (first || y + fm.descent <= r.bottom)) {
             first = false
             val n = p.breakText(rest, true, maxW, null).coerceAtLeast(1)
             cv.drawText(rest, 0, n, r.left + padLeft, y, p)
@@ -220,6 +225,7 @@ object WeekBitmapRenderer {
             rest = rest.substring(n)
             y += lineH
         }
+        p.textSize = baseSize
         cv.restore()
     }
 }
