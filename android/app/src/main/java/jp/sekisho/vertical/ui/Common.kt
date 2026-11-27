@@ -20,8 +20,13 @@ fun c(argb: Int) = Color(argb)
  */
 val LocalTextScale = compositionLocalOf { 1f }
 
-fun textScaleFor(columnWidth: Dp): Float = (columnWidth / 50.dp).coerceIn(1f, MAX_TEXT_SCALE)
-const val MAX_TEXT_SCALE = 1.6f
+/**
+ * 文字の拡大率。1日分の列幅と、画面の高さの小さい方に合わせる
+ * （横向きのタブレットのように横長の画面で、文字だけ大きくなって縦に入りきらないのを防ぐ）
+ */
+fun textScaleFor(columnWidth: Dp, height: Dp = Dp.Infinity): Float =
+    minOf(columnWidth / 50.dp, height / 600.dp).coerceIn(1f, MAX_TEXT_SCALE)
+const val MAX_TEXT_SCALE = 2f
 
 @Composable
 fun ssp(v: Float): TextUnit = (v * LocalTextScale.current).sp

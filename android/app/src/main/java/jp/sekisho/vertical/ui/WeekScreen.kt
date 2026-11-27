@@ -109,7 +109,7 @@ fun WeekScreen(
     val today = LocalDate.now()
 
     BoxWithConstraints(modifier.fillMaxSize().padding(4.dp)) {
-    val scale = textScaleFor((maxWidth - 26.dp) / 7)
+    val scale = textScaleFor((maxWidth - 26.dp) / 7, maxHeight)
     CompositionLocalProvider(LocalTextScale provides scale) {
     Column(
         Modifier

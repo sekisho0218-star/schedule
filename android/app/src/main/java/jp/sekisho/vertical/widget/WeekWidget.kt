@@ -107,18 +107,18 @@ private fun WidgetContent(version: Long, startToday: Boolean) {
     val tasks = linked.mapValues { it.value.second }
 
     // 広い画面（Galaxy Z Fold の内側画面など）では文字と行を大きくする
-    val ts = WeekBitmapRenderer.textScale(size.width.value)
+    val ts = WeekBitmapRenderer.textScale(size.width.value, size.height.value)
     val titleH = (28f * ts.coerceAtMost(1.3f)).dp
     // タスクは2行まで折り返して読めるように、行を高めにとる
     val rowH = (27f * ts).dp
-    val axisW = WeekBitmapRenderer.axisDp(size.width.value).dp
+    val axisW = WeekBitmapRenderer.axisDp(ts).dp
     val tasksH = rowH * TaskRepository.PER_DAY + (TaskRepository.PER_DAY - 1).dp
     val imageH = (size.height - titleH - tasksH).coerceAtLeast(60.dp)
     // 画面の解像度どおりに描いて文字のぼやけを防ぐ（RGB_565 でメモリを節約）
     val scale = context.resources.displayMetrics.density.coerceAtMost(3.5f)
-    val bitmap = remember(version, size, weekStart, today, now.hour, now.minute / 15) {
+    val bitmap = remember(version, size, ts, weekStart, today, now.hour, now.minute / 15) {
         WeekBitmapRenderer.render(
-            size.width.value, imageH.value, scale, days, dayEvents, today, now,
+            size.width.value, imageH.value, scale, ts, days, dayEvents, today, now,
             serif = runCatching { ResourcesCompat.getFont(context, R.font.cormorant_medium) }.getOrNull(),
             serifItalic = runCatching { ResourcesCompat.getFont(context, R.font.cormorant_medium_italic) }.getOrNull(),
             sans = runCatching { ResourcesCompat.getFont(context, R.font.intertight_regular) }.getOrNull(),

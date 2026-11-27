@@ -20,14 +20,18 @@ object WeekBitmapRenderer {
     private const val BASE_AXIS_DP = 18f
 
     /** 文字の拡大率：1日分の列幅に比例（スマホ=1.0、Galaxy Z Fold の内側画面など広い画面で最大1.6） */
-    fun textScale(widthDp: Float): Float = ((widthDp - BASE_AXIS_DP) / 7f / 50f).coerceIn(1f, 1.6f)
+    // 横長のウィジェット（横向きのタブレットなど）では高さでも抑え、縦に入りきらないのを防ぐ
+    fun textScale(widthDp: Float, heightDp: Float = Float.MAX_VALUE): Float =
+        minOf((widthDp - BASE_AXIS_DP) / 7f / 50f, heightDp / 450f).coerceIn(1f, 1.6f)
 
-    fun axisDp(widthDp: Float): Float = BASE_AXIS_DP * textScale(widthDp)
+    fun axisDp(ts: Float): Float = BASE_AXIS_DP * ts
 
     fun render(
         widthDp: Float,
         heightDp: Float,
         scale: Float,
+        /** 文字の拡大率（textScale） */
+        ts: Float,
         days: List<LocalDate>,
         dayEvents: Map<LocalDate, DayEvents>,
         today: LocalDate,
@@ -43,7 +47,6 @@ object WeekBitmapRenderer {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
         val cv = Canvas(bmp)
         fun dp(v: Float) = v * scale
-        val ts = textScale(widthDp)
         /** 文字・部品のサイズ（拡大率を掛ける） */
         fun sz(v: Float) = v * scale * ts
 
@@ -53,7 +56,7 @@ object WeekBitmapRenderer {
 
         cv.drawColor(Palette.PAPER)
 
-        val axisW = dp(axisDp(widthDp))
+        val axisW = dp(axisDp(ts))
         val colW = (w - axisW) / 7f
         val headerH = sz(30f)
         val eventText = Paint(Paint.ANTI_ALIAS_FLAG).apply {

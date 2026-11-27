@@ -63,7 +63,7 @@ fun MonthScreen(
     }
 
     BoxWithConstraints(modifier.fillMaxSize().padding(4.dp)) {
-    val scale = textScaleFor(maxWidth / 7)
+    val scale = textScaleFor(maxWidth / 7, maxHeight)
     // セルの高さに入るだけ予定を表示（1行 ≒ 文字サイズ10×拡大率×1.45）
     val rowH = (maxHeight - (28f * scale).dp) / weeks
     val maxItems = ((rowH - (34f * scale).dp) / (14.5f * scale).dp).toInt().coerceIn(1, 10)
