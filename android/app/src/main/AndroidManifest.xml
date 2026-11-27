@@ -43,6 +43,10 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
+            <!-- Xiaomi（HyperOS／MIUI）のランチャーで 4×4 などの大きさを使えるようにする印 -->
+            <meta-data
+                android:name="miuiWidget"
+                android:value="true" />
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/week_widget_info_tall" />
@@ -54,6 +58,10 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
+            <!-- Xiaomi（HyperOS／MIUI）のランチャーで 4×4 などの大きさを使えるようにする印 -->
+            <meta-data
+                android:name="miuiWidget"
+                android:value="true" />
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/week_widget_info_large" />

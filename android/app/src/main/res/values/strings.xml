@@ -2,8 +2,8 @@
     <string name="app_name">バーチカル手帳</string>
     <string name="widget_name">週間バーチカル</string>
     <string name="widget_description">今週の予定（8:00〜24:00）とタスクを表示します</string>
-    <string name="widget_name_tall">週間バーチカル（縦長）</string>
-    <string name="widget_description_tall">縦長の大きさで置く週間バーチカル（タブレット向け）</string>
+    <string name="widget_name_tall">週間バーチカル（4×4）</string>
+    <string name="widget_description_tall">4×4 の大きさで置く週間バーチカル（Xiaomi のタブレット向け）</string>
     <string name="widget_name_large">週間バーチカル（大）</string>
     <string name="widget_description_large">画面いっぱいに近い大きさで置く週間バーチカル（タブレット向け）</string>
 </resources>
